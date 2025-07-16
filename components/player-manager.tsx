@@ -76,7 +76,7 @@ export function PlayerManager() {
   }
 
   const getPlayerStats = (playerId: string) => {
-    const playerTransactions = transactions.filter((t) => t.playerId === playerId)
+    const playerTransactions = transactions.filter((t) => t.player_id === playerId)
     const buyIns = playerTransactions.filter((t) => t.type === "buy-in").reduce((sum, t) => sum + t.amount, 0)
     const cashOuts = playerTransactions.filter((t) => t.type === "cash-out").reduce((sum, t) => sum + t.amount, 0)
     const payments = playerTransactions.filter((t) => t.type === "payment").reduce((sum, t) => sum + t.amount, 0)
@@ -197,7 +197,7 @@ export function PlayerManager() {
                     <div className="min-w-0 flex-1">
                       <CardTitle className="text-base sm:text-lg truncate">{player.name}</CardTitle>
                       <CardDescription className="text-xs sm:text-sm">
-                        Entrou em: {new Date(player.createdAt).toLocaleDateString("pt-BR")}
+                        Entrou em: {new Date(player.created_at).toLocaleDateString("pt-BR")}
                       </CardDescription>
                     </div>
                   </div>

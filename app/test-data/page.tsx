@@ -4,283 +4,330 @@ import { useState } from "react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Alert, AlertDescription } from "@/components/ui/alert"
-import { usePokerStore } from "@/lib/store"
+import { Badge } from "@/components/ui/badge"
+import { AuthGuard } from "@/components/auth/auth-guard"
 import { supabase } from "@/lib/supabase"
-import { CheckCircle, AlertCircle, Loader2 } from "lucide-react"
+import { ArrowLeft, Database, Users, CreditCard, Play } from "lucide-react"
+import Link from "next/link"
 
 export default function TestDataPage() {
-  const { addSession, addPlayer, addTransaction, loadData } = usePokerStore()
   const [loading, setLoading] = useState(false)
-  const [results, setResults] = useState<{ success: boolean; message: string }[]>([])
-  const [user, setUser] = useState<any>(null)
+  const [results, setResults] = useState<any[]>([])
+  const [error, setError] = useState("")
 
-  const checkUser = async () => {
-    const { data: { user } } = await supabase.auth.getUser()
-    setUser(user)
-    return user
+  const addResult = (type: string, success: boolean, data: any, error?: string) => {
+    const result = {
+      id: Date.now(),
+      type,
+      success,
+      data,
+      error,
+      timestamp: new Date().toLocaleTimeString()
+    }
+    setResults(prev => [result, ...prev])
   }
 
-  const createTestData = async () => {
-    setLoading(true)
+  const clearResults = () => {
     setResults([])
-    
+    setError("")
+  }
+
+  const createTestSession = async () => {
     try {
-      // Verificar se usuário está logado
-      const currentUser = await checkUser()
-      if (!currentUser) {
-        setResults([{ success: false, message: "Usuário não está logado" }])
-        return
+      const { data: { user } } = await supabase.auth.getUser()
+      if (!user) throw new Error("Usuário não encontrado")
+
+      const sessionData = {
+        name: `Sessão de Teste ${new Date().toLocaleDateString('pt-BR')} ${new Date().toLocaleTimeString('pt-BR')}`,
+        status: 'active',
+        user_id: user.id
       }
 
-      const newResults: { success: boolean; message: string }[] = []
+      const { data, error } = await supabase
+        .from('sessions')
+        .insert([sessionData])
+        .select()
+
+      if (error) throw error
+
+      addResult('session', true, data[0])
+      return data[0]
+    } catch (err: any) {
+      addResult('session', false, null, err.message)
+      throw err
+    }
+  }
+
+  const createTestPlayer = async () => {
+    try {
+      const { data: { user } } = await supabase.auth.getUser()
+      if (!user) throw new Error("Usuário não encontrado")
+
+      const playerData = {
+        name: `Jogador Teste ${Date.now()}`,
+        email: `jogador${Date.now()}@teste.com`,
+        user_id: user.id
+      }
+
+      const { data, error } = await supabase
+        .from('players')
+        .insert([playerData])
+        .select()
+
+      if (error) throw error
+
+      addResult('player', true, data[0])
+      return data[0]
+    } catch (err: any) {
+      addResult('player', false, null, err.message)
+      throw err
+    }
+  }
+
+  const createTestTransaction = async (sessionId: string, playerId: string) => {
+    try {
+      const { data: { user } } = await supabase.auth.getUser()
+      if (!user) throw new Error("Usuário não encontrado")
+
+      const transactionData = {
+        session_id: sessionId,
+        player_id: playerId,
+        type: 'buy-in',
+        amount: Math.floor(Math.random() * 500) + 50, // R$ 50-550
+        description: 'Buy-in de teste automático',
+        user_id: user.id
+      }
+
+      const { data, error } = await supabase
+        .from('transactions')
+        .insert([transactionData])
+        .select()
+
+      if (error) throw error
+
+      addResult('transaction', true, data[0])
+      return data[0]
+    } catch (err: any) {
+      addResult('transaction', false, null, err.message)
+      throw err
+    }
+  }
+
+  const runCompleteTest = async () => {
+    setLoading(true)
+    setError("")
+
+    try {
+      console.log("🚀 Iniciando teste completo...")
 
       // 1. Criar sessão
-      try {
-        await addSession({
-          name: "Sessão de Poker - Sexta à Noite",
-          status: "active",
-          tableCount: 2,
-          notes: "Sessão semanal com amigos"
-        })
-        newResults.push({ success: true, message: "✅ Sessão criada com sucesso" })
-      } catch (error) {
-        newResults.push({ success: false, message: `❌ Erro ao criar sessão: ${error}` })
-      }
+      const session = await createTestSession()
+      
+      // 2. Criar jogador
+      const player = await createTestPlayer()
+      
+      // 3. Criar transação
+      await createTestTransaction(session.id, player.id)
 
-      // 2. Criar jogadores
-      const players = [
-        { name: "João Silva", email: "joao@email.com", phone: "11999999999", notes: "Jogador regular" },
-        { name: "Maria Santos", email: "maria@email.com", phone: "11888888888", notes: "Jogadora iniciante" },
-        { name: "Pedro Costa", email: "pedro@email.com", phone: "11777777777", notes: "Jogador experiente" },
-        { name: "Ana Oliveira", email: "ana@email.com", phone: "11666666666", notes: "Jogadora profissional" }
-      ]
-
-      const createdPlayers: any[] = []
-      for (const player of players) {
-        try {
-          await addPlayer(player)
-          createdPlayers.push(player)
-          newResults.push({ success: true, message: `✅ Jogador ${player.name} criado` })
-        } catch (error) {
-          newResults.push({ success: false, message: `❌ Erro ao criar jogador ${player.name}: ${error}` })
-        }
-      }
-
-      // 3. Aguardar um pouco para garantir que os dados foram salvos
-      await new Promise(resolve => setTimeout(resolve, 1000))
-
-      // 4. Recarregar dados para pegar os IDs
-      await loadData()
-
-      // 5. Buscar sessões e jogadores criados
-      const { data: sessions } = await supabase
-        .from('sessions')
-        .select('*')
-        .eq('user_id', currentUser.id)
-        .order('created_at', { ascending: false })
-        .limit(1)
-
-      const { data: playersData } = await supabase
-        .from('players')
-        .select('*')
-        .eq('user_id', currentUser.id)
-        .order('created_at', { ascending: false })
-        .limit(4)
-
-      if (sessions && sessions.length > 0 && playersData && playersData.length > 0) {
-        const sessionId = sessions[0].id
-
-        // 6. Criar transações
-        const transactions = [
-          { playerId: playersData[0].id, type: "buy-in" as const, amount: 200, notes: "Buy-in inicial" },
-          { playerId: playersData[1].id, type: "buy-in" as const, amount: 150, notes: "Buy-in inicial" },
-          { playerId: playersData[2].id, type: "buy-in" as const, amount: 300, notes: "Buy-in inicial" },
-          { playerId: playersData[3].id, type: "buy-in" as const, amount: 250, notes: "Buy-in inicial" },
-          { playerId: playersData[0].id, type: "cash-out" as const, amount: 350, notes: "Cash-out com lucro" },
-          { playerId: playersData[1].id, type: "cash-out" as const, amount: 80, notes: "Cash-out com prejuízo" },
-          { playerId: playersData[2].id, type: "cash-out" as const, amount: 450, notes: "Cash-out com lucro" },
-          { playerId: playersData[3].id, type: "cash-out" as const, amount: 200, notes: "Cash-out no zero a zero" }
-        ]
-
-        for (const transaction of transactions) {
-          try {
-            await addTransaction({
-              sessionId,
-              ...transaction
-            })
-            newResults.push({ 
-              success: true, 
-              message: `✅ Transação ${transaction.type} R$${transaction.amount} criada` 
-            })
-          } catch (error) {
-            newResults.push({ 
-              success: false, 
-              message: `❌ Erro ao criar transação: ${error}` 
-            })
-          }
-        }
-      } else {
-        newResults.push({ success: false, message: "❌ Não foi possível encontrar sessão ou jogadores para criar transações" })
-      }
-
-      // 7. Recarregar dados finais
-      await loadData()
-
-      setResults(newResults)
-
-    } catch (error) {
-      setResults([{ success: false, message: `❌ Erro geral: ${error}` }])
+      console.log("✅ Teste completo realizado com sucesso!")
+      
+    } catch (err: any) {
+      console.error("❌ Erro no teste:", err)
+      setError(`Erro no teste completo: ${err.message}`)
     } finally {
       setLoading(false)
     }
   }
 
-  const clearTestData = async () => {
-    setLoading(true)
+  const testUserInfo = async () => {
     try {
-      const currentUser = await checkUser()
-      if (!currentUser) {
-        setResults([{ success: false, message: "Usuário não está logado" }])
-        return
-      }
-
-      // Deletar dados de teste (opcional - apenas para limpeza)
-      const { error: sessionsError } = await supabase
-        .from('sessions')
-        .delete()
-        .eq('user_id', currentUser.id)
-        .like('name', '%Teste%')
-
-      const { error: playersError } = await supabase
-        .from('players')
-        .delete()
-        .eq('user_id', currentUser.id)
-        .like('name', '%Teste%')
-
-      if (!sessionsError && !playersError) {
-        setResults([{ success: true, message: "✅ Dados de teste removidos" }])
-        await loadData()
-      } else {
-        setResults([{ success: false, message: "❌ Erro ao remover dados de teste" }])
-      }
-    } catch (error) {
-      setResults([{ success: false, message: `❌ Erro: ${error}` }])
-    } finally {
-      setLoading(false)
+      const { data: { user }, error } = await supabase.auth.getUser()
+      
+      if (error) throw error
+      
+      addResult('user_info', true, {
+        id: user?.id,
+        email: user?.email,
+        created_at: user?.created_at
+      })
+    } catch (err: any) {
+      addResult('user_info', false, null, err.message)
     }
   }
 
   return (
-    <div className="p-4 max-w-4xl mx-auto">
-      <h1 className="text-2xl font-bold mb-6">Teste de Envio de Dados para Supabase</h1>
-      
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
-        <Card>
-          <CardHeader>
-            <CardTitle>Status do Usuário</CardTitle>
-            <CardDescription>Verificação de autenticação</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <p>Logado: {user ? '✅ Sim' : '❌ Não'}</p>
-            {user && (
-              <p className="text-sm text-gray-600">Email: {user.email}</p>
-            )}
-          </CardContent>
-        </Card>
+    <AuthGuard>
+      <div className="min-h-screen bg-gradient-to-br from-green-50 to-blue-50 p-4">
+        <div className="max-w-4xl mx-auto">
+          <div className="mb-6 flex items-center gap-4">
+            <Link href="/dashboard">
+              <Button variant="outline" size="sm">
+                <ArrowLeft className="h-4 w-4 mr-2" />
+                Voltar ao Dashboard
+              </Button>
+            </Link>
+            <div>
+              <h1 className="text-3xl font-bold text-gray-900">Teste de Dados</h1>
+              <p className="text-gray-600">Teste a criação de dados no Supabase</p>
+            </div>
+          </div>
 
-        <Card>
-          <CardHeader>
-            <CardTitle>Ações de Teste</CardTitle>
-            <CardDescription>Criar dados fictícios no Supabase</CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-3">
-            <Button 
-              onClick={createTestData} 
-              disabled={loading}
-              className="w-full"
-            >
-              {loading ? (
-                <>
-                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                  Criando dados...
-                </>
-              ) : (
-                "🚀 Criar Dados de Teste"
-              )}
-            </Button>
-            
-            <Button 
-              onClick={clearTestData} 
-              disabled={loading}
-              variant="outline"
-              className="w-full"
-            >
-              🗑️ Limpar Dados de Teste
-            </Button>
-          </CardContent>
-        </Card>
-      </div>
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            {/* Controles de Teste */}
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <Database className="h-5 w-5" />
+                  Controles de Teste
+                </CardTitle>
+                <CardDescription>
+                  Execute testes individuais ou o fluxo completo
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="grid grid-cols-2 gap-3">
+                  <Button
+                    onClick={testUserInfo}
+                    variant="outline"
+                    size="sm"
+                    disabled={loading}
+                  >
+                    <Users className="h-4 w-4 mr-2" />
+                    Info Usuário
+                  </Button>
+                  
+                  <Button
+                    onClick={createTestSession}
+                    variant="outline"
+                    size="sm"
+                    disabled={loading}
+                  >
+                    <Play className="h-4 w-4 mr-2" />
+                    Criar Sessão
+                  </Button>
+                  
+                  <Button
+                    onClick={createTestPlayer}
+                    variant="outline"
+                    size="sm"
+                    disabled={loading}
+                  >
+                    <Users className="h-4 w-4 mr-2" />
+                    Criar Jogador
+                  </Button>
+                  
+                  <Button
+                    onClick={() => {
+                      if (results.length >= 2) {
+                        const session = results.find(r => r.type === 'session' && r.success)
+                        const player = results.find(r => r.type === 'player' && r.success)
+                        if (session && player) {
+                          createTestTransaction(session.data.id, player.data.id)
+                        } else {
+                          setError("Crie uma sessão e um jogador primeiro")
+                        }
+                      } else {
+                        setError("Crie uma sessão e um jogador primeiro")
+                      }
+                    }}
+                    variant="outline"
+                    size="sm"
+                    disabled={loading}
+                  >
+                    <CreditCard className="h-4 w-4 mr-2" />
+                    Criar Transação
+                  </Button>
+                </div>
 
-      {results.length > 0 && (
-        <Card>
-          <CardHeader>
-            <CardTitle>Resultados do Teste</CardTitle>
-            <CardDescription>Status de cada operação</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <div className="space-y-2">
-              {results.map((result, index) => (
-                <Alert key={index} variant={result.success ? "default" : "destructive"}>
-                  {result.success ? (
-                    <CheckCircle className="h-4 w-4" />
+                <div className="border-t pt-4">
+                  <Button
+                    onClick={runCompleteTest}
+                    className="w-full"
+                    disabled={loading}
+                  >
+                    {loading ? "Executando..." : "🚀 Teste Completo"}
+                  </Button>
+                </div>
+
+                <Button
+                  onClick={clearResults}
+                  variant="outline"
+                  size="sm"
+                  className="w-full"
+                >
+                  Limpar Resultados
+                </Button>
+
+                {error && (
+                  <Alert variant="destructive">
+                    <AlertDescription>{error}</AlertDescription>
+                  </Alert>
+                )}
+              </CardContent>
+            </Card>
+
+            {/* Resultados */}
+            <Card>
+              <CardHeader>
+                <CardTitle>Resultados dos Testes</CardTitle>
+                <CardDescription>
+                  {results.length} teste(s) executado(s)
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-3 max-h-96 overflow-y-auto">
+                  {results.length === 0 ? (
+                    <p className="text-gray-500 text-center py-8">
+                      Nenhum teste executado ainda
+                    </p>
                   ) : (
-                    <AlertCircle className="h-4 w-4" />
+                    results.map((result) => (
+                      <div
+                        key={result.id}
+                        className={`p-3 rounded-lg border ${
+                          result.success
+                            ? "bg-green-50 border-green-200"
+                            : "bg-red-50 border-red-200"
+                        }`}
+                      >
+                        <div className="flex items-center justify-between mb-2">
+                          <div className="flex items-center gap-2">
+                            <Badge
+                              variant={result.success ? "default" : "destructive"}
+                            >
+                              {result.type}
+                            </Badge>
+                            <span className="text-xs text-gray-500">
+                              {result.timestamp}
+                            </span>
+                          </div>
+                          <Badge
+                            variant={result.success ? "secondary" : "destructive"}
+                          >
+                            {result.success ? "✅ Sucesso" : "❌ Erro"}
+                          </Badge>
+                        </div>
+                        
+                        {result.error && (
+                          <p className="text-red-600 text-sm mb-2">
+                            {result.error}
+                          </p>
+                        )}
+                        
+                        {result.data && (
+                          <pre className="text-xs bg-gray-100 p-2 rounded overflow-x-auto">
+                            {JSON.stringify(result.data, null, 2)}
+                          </pre>
+                        )}
+                      </div>
+                    ))
                   )}
-                  <AlertDescription>{result.message}</AlertDescription>
-                </Alert>
-              ))}
-            </div>
-          </CardContent>
-        </Card>
-      )}
-
-      <div className="mt-6">
-        <Card>
-          <CardHeader>
-            <CardTitle>Dados que serão criados</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="space-y-4">
-              <div>
-                <h4 className="font-medium">📋 Sessão:</h4>
-                <ul className="text-sm text-gray-600 ml-4">
-                  <li>Nome: "Sessão de Poker - Sexta à Noite"</li>
-                  <li>Status: Ativa</li>
-                  <li>Mesas: 2</li>
-                </ul>
-              </div>
-              
-              <div>
-                <h4 className="font-medium">👥 Jogadores:</h4>
-                <ul className="text-sm text-gray-600 ml-4">
-                  <li>João Silva (regular)</li>
-                  <li>Maria Santos (iniciante)</li>
-                  <li>Pedro Costa (experiente)</li>
-                  <li>Ana Oliveira (profissional)</li>
-                </ul>
-              </div>
-              
-              <div>
-                <h4 className="font-medium">💰 Transações:</h4>
-                <ul className="text-sm text-gray-600 ml-4">
-                  <li>4 Buy-ins (R$ 200, R$ 150, R$ 300, R$ 250)</li>
-                  <li>4 Cash-outs (R$ 350, R$ 80, R$ 450, R$ 200)</li>
-                </ul>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
+                </div>
+              </CardContent>
+            </Card>
+          </div>
+        </div>
       </div>
-    </div>
+    </AuthGuard>
   )
 } 

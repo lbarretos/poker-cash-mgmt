@@ -84,7 +84,7 @@ export function SessionManager() {
     const newStatus = session.status === "active" ? "completed" : "active"
     updateSession(session.id, {
       status: newStatus,
-      completedAt: newStatus === "completed" ? new Date().toISOString() : undefined,
+      end_time: newStatus === "completed" ? new Date().toISOString() : undefined,
     })
     toast({
       title: `Sessão ${newStatus === "active" ? "reativada" : "concluída"}`,
@@ -190,10 +190,10 @@ export function SessionManager() {
                     </Badge>
                   </CardTitle>
                   <CardDescription className="text-xs sm:text-sm">
-                    <div>Criada em: {new Date(session.createdAt).toLocaleString("pt-BR")}</div>
-                    {session.completedAt && (
-                      <div className="mt-1">Concluída em: {new Date(session.completedAt).toLocaleString("pt-BR")}</div>
-                    )}
+                    <div>Criada em: {new Date(session.created_at).toLocaleString("pt-BR")}</div>
+                                          {session.end_time && (
+                        <div className="mt-1">Concluída em: {new Date(session.end_time).toLocaleString("pt-BR")}</div>
+                      )}
                   </CardDescription>
                 </div>
 

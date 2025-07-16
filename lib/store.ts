@@ -7,7 +7,7 @@ export interface Player {
   email?: string
   phone?: string
   notes?: string
-  createdAt: string
+  created_at: string
   user_id?: string
 }
 
@@ -15,31 +15,35 @@ export interface Session {
   id: string
   name: string
   status: "active" | "completed"
-  createdAt: string
-  completedAt?: string
-  tableCount: number
+  created_at: string
+  start_time?: string
+  end_time?: string
+  tableCount?: number // This field doesn't exist in DB, keeping for UI compatibility
   notes?: string
   user_id?: string
 }
 
 export interface Transaction {
   id: string
-  sessionId: string
-  playerId: string
+  session_id: string
+  player_id: string
   type: "buy-in" | "cash-out" | "payment"
   amount: number
-  timestamp: string
+  created_at: string
+  description?: string
   notes?: string
-  tableNumber?: number
+  tableNumber?: number // UI only field
   user_id?: string
 }
 
 export interface ChipType {
   id: string
+  name?: string
   color: string
   value: number
-  count: number
+  count?: number // UI only field, not in DB
   user_id?: string
+  created_at?: string
 }
 
 export interface PokerStore {
@@ -49,22 +53,22 @@ export interface PokerStore {
   chips: ChipType[]
 
   // Session actions
-  addSession: (session: Omit<Session, "id" | "createdAt" | "user_id">) => Promise<void>
+  addSession: (session: Omit<Session, "id" | "created_at" | "user_id">) => Promise<void>
   updateSession: (id: string, updates: Partial<Session>) => Promise<void>
   deleteSession: (id: string) => Promise<void>
 
   // Player actions
-  addPlayer: (player: Omit<Player, "id" | "createdAt" | "user_id">) => Promise<void>
+  addPlayer: (player: Omit<Player, "id" | "created_at" | "user_id">) => Promise<void>
   updatePlayer: (id: string, updates: Partial<Player>) => Promise<void>
   deletePlayer: (id: string) => Promise<void>
 
   // Transaction actions
-  addTransaction: (transaction: Omit<Transaction, "id" | "timestamp" | "user_id">) => Promise<void>
+  addTransaction: (transaction: Omit<Transaction, "id" | "created_at" | "user_id">) => Promise<void>
   updateTransaction: (id: string, updates: Partial<Transaction>) => Promise<void>
   deleteTransaction: (id: string) => Promise<void>
 
   // Chip actions
-  addChipType: (chip: Omit<ChipType, "id" | "user_id">) => Promise<void>
+  addChipType: (chip: Omit<ChipType, "id" | "user_id" | "created_at">) => Promise<void>
   updateChipType: (id: string, updates: Partial<ChipType>) => Promise<void>
   deleteChipType: (id: string) => Promise<void>
   updateChipCount: (id: string, count: number) => Promise<void>
@@ -88,41 +92,74 @@ export const usePokerStore = create<PokerStore>()((set, get) => ({
   // Carregar dados do Supabase
   loadData: async () => {
     try {
+      console.log('🔄 Carregando dados do Supabase...')
       const { data: { user } } = await supabase.auth.getUser()
-      if (!user) return
+      if (!user) {
+        console.log('❌ Usuário não encontrado')
+        return
+      }
 
       // Carregar sessões
-      const { data: sessions } = await supabase
+      const { data: sessions, error: sessionsError } = await supabase
         .from('sessions')
         .select('*')
         .eq('user_id', user.id)
+        .order('created_at', { ascending: false })
+
+      if (sessionsError) {
+        console.error('❌ Erro ao carregar sessões:', sessionsError)
+      } else {
+        console.log(`✅ ${sessions?.length || 0} sessões carregadas`)
+      }
 
       // Carregar jogadores
-      const { data: players } = await supabase
+      const { data: players, error: playersError } = await supabase
         .from('players')
         .select('*')
         .eq('user_id', user.id)
+        .order('created_at', { ascending: false })
+
+      if (playersError) {
+        console.error('❌ Erro ao carregar jogadores:', playersError)
+      } else {
+        console.log(`✅ ${players?.length || 0} jogadores carregados`)
+      }
 
       // Carregar transações
-      const { data: transactions } = await supabase
+      const { data: transactions, error: transactionsError } = await supabase
         .from('transactions')
         .select('*')
         .eq('user_id', user.id)
+        .order('created_at', { ascending: false })
+
+      if (transactionsError) {
+        console.error('❌ Erro ao carregar transações:', transactionsError)
+      } else {
+        console.log(`✅ ${transactions?.length || 0} transações carregadas`)
+      }
 
       // Carregar chips
-      const { data: chips } = await supabase
+      const { data: chips, error: chipsError } = await supabase
         .from('chip_types')
         .select('*')
         .eq('user_id', user.id)
+
+      if (chipsError) {
+        console.error('❌ Erro ao carregar tipos de fichas:', chipsError)
+      } else {
+        console.log(`✅ ${chips?.length || 0} tipos de fichas carregados`)
+      }
 
       set({
         sessions: sessions || [],
         players: players || [],
         transactions: transactions || [],
-        chips: chips || get().chips
+        chips: chips?.length ? chips : get().chips
       })
+      
+      console.log('✅ Dados carregados com sucesso!')
     } catch (error) {
-      console.error('Error loading data:', error)
+      console.error('💥 Erro ao carregar dados:', error)
     }
   },
 
@@ -132,26 +169,28 @@ export const usePokerStore = create<PokerStore>()((set, get) => ({
       if (!user) return
 
       const newSession = {
-        ...session,
-        id: crypto.randomUUID(),
-        createdAt: new Date().toISOString(),
+        name: session.name,
+        status: session.status,
         user_id: user.id
       }
 
+      console.log('➕ Criando sessão:', newSession)
+      
       const { data, error } = await supabase
         .from('sessions')
         .insert([newSession])
         .select()
 
       if (!error && data) {
+        console.log('✅ Sessão criada no banco:', data[0])
         set((state) => ({
-          sessions: [...state.sessions, data[0]]
+          sessions: [data[0], ...state.sessions]
         }))
       } else {
-        console.error('Error adding session:', error)
+        console.error('❌ Erro ao criar sessão:', error)
       }
     } catch (error) {
-      console.error('Error adding session:', error)
+      console.error('💥 Erro ao adicionar sessão:', error)
     }
   },
 
@@ -160,23 +199,35 @@ export const usePokerStore = create<PokerStore>()((set, get) => ({
       const { data: { user } } = await supabase.auth.getUser()
       if (!user) return
 
+      // Remove campos que não existem no DB
+      const dbUpdates = { ...updates }
+      delete dbUpdates.tableCount
+      
+      // Mapear campos para o formato do DB
+      if (updates.status === 'completed' && !dbUpdates.end_time) {
+        dbUpdates.end_time = new Date().toISOString()
+      }
+
+      console.log('✏️ Atualizando sessão:', id, dbUpdates)
+
       const { error } = await supabase
         .from('sessions')
-        .update(updates)
+        .update(dbUpdates)
         .eq('id', id)
         .eq('user_id', user.id)
 
       if (!error) {
+        console.log('✅ Sessão atualizada no banco')
         set((state) => ({
           sessions: state.sessions.map((session) => 
             session.id === id ? { ...session, ...updates } : session
           ),
         }))
       } else {
-        console.error('Error updating session:', error)
+        console.error('❌ Erro ao atualizar sessão:', error)
       }
     } catch (error) {
-      console.error('Error updating session:', error)
+      console.error('💥 Erro ao atualizar sessão:', error)
     }
   },
 
@@ -185,6 +236,8 @@ export const usePokerStore = create<PokerStore>()((set, get) => ({
       const { data: { user } } = await supabase.auth.getUser()
       if (!user) return
 
+      console.log('🗑️ Deletando sessão:', id)
+
       const { error } = await supabase
         .from('sessions')
         .delete()
@@ -192,15 +245,16 @@ export const usePokerStore = create<PokerStore>()((set, get) => ({
         .eq('user_id', user.id)
 
       if (!error) {
+        console.log('✅ Sessão deletada do banco')
         set((state) => ({
           sessions: state.sessions.filter((session) => session.id !== id),
-          transactions: state.transactions.filter((transaction) => transaction.sessionId !== id),
+          transactions: state.transactions.filter((transaction) => transaction.session_id !== id),
         }))
       } else {
-        console.error('Error deleting session:', error)
+        console.error('❌ Erro ao deletar sessão:', error)
       }
     } catch (error) {
-      console.error('Error deleting session:', error)
+      console.error('💥 Erro ao deletar sessão:', error)
     }
   },
 
@@ -210,11 +264,13 @@ export const usePokerStore = create<PokerStore>()((set, get) => ({
       if (!user) return
 
       const newPlayer = {
-        ...player,
-        id: crypto.randomUUID(),
-        createdAt: new Date().toISOString(),
+        name: player.name,
+        email: player.email,
+        phone: player.phone,
         user_id: user.id
       }
+
+      console.log('➕ Criando jogador:', newPlayer)
 
       const { data, error } = await supabase
         .from('players')
@@ -222,14 +278,15 @@ export const usePokerStore = create<PokerStore>()((set, get) => ({
         .select()
 
       if (!error && data) {
+        console.log('✅ Jogador criado no banco:', data[0])
         set((state) => ({
-          players: [...state.players, data[0]]
+          players: [data[0], ...state.players]
         }))
       } else {
-        console.error('Error adding player:', error)
+        console.error('❌ Erro ao criar jogador:', error)
       }
     } catch (error) {
-      console.error('Error adding player:', error)
+      console.error('💥 Erro ao adicionar jogador:', error)
     }
   },
 
@@ -238,6 +295,8 @@ export const usePokerStore = create<PokerStore>()((set, get) => ({
       const { data: { user } } = await supabase.auth.getUser()
       if (!user) return
 
+      console.log('✏️ Atualizando jogador:', id, updates)
+
       const { error } = await supabase
         .from('players')
         .update(updates)
@@ -245,16 +304,17 @@ export const usePokerStore = create<PokerStore>()((set, get) => ({
         .eq('user_id', user.id)
 
       if (!error) {
+        console.log('✅ Jogador atualizado no banco')
         set((state) => ({
           players: state.players.map((player) => 
             player.id === id ? { ...player, ...updates } : player
           ),
         }))
       } else {
-        console.error('Error updating player:', error)
+        console.error('❌ Erro ao atualizar jogador:', error)
       }
     } catch (error) {
-      console.error('Error updating player:', error)
+      console.error('💥 Erro ao atualizar jogador:', error)
     }
   },
 
@@ -263,6 +323,8 @@ export const usePokerStore = create<PokerStore>()((set, get) => ({
       const { data: { user } } = await supabase.auth.getUser()
       if (!user) return
 
+      console.log('🗑️ Deletando jogador:', id)
+
       const { error } = await supabase
         .from('players')
         .delete()
@@ -270,15 +332,16 @@ export const usePokerStore = create<PokerStore>()((set, get) => ({
         .eq('user_id', user.id)
 
       if (!error) {
+        console.log('✅ Jogador deletado do banco')
         set((state) => ({
           players: state.players.filter((player) => player.id !== id),
-          transactions: state.transactions.filter((transaction) => transaction.playerId !== id),
+          transactions: state.transactions.filter((transaction) => transaction.player_id !== id),
         }))
       } else {
-        console.error('Error deleting player:', error)
+        console.error('❌ Erro ao deletar jogador:', error)
       }
     } catch (error) {
-      console.error('Error deleting player:', error)
+      console.error('💥 Erro ao deletar jogador:', error)
     }
   },
 
@@ -288,11 +351,15 @@ export const usePokerStore = create<PokerStore>()((set, get) => ({
       if (!user) return
 
       const newTransaction = {
-        ...transaction,
-        id: crypto.randomUUID(),
-        timestamp: new Date().toISOString(),
+        session_id: transaction.session_id,
+        player_id: transaction.player_id,
+        type: transaction.type,
+        amount: transaction.amount,
+        description: transaction.notes || transaction.description,
         user_id: user.id
       }
+
+      console.log('➕ Criando transação:', newTransaction)
 
       const { data, error } = await supabase
         .from('transactions')
@@ -300,14 +367,15 @@ export const usePokerStore = create<PokerStore>()((set, get) => ({
         .select()
 
       if (!error && data) {
+        console.log('✅ Transação criada no banco:', data[0])
         set((state) => ({
-          transactions: [...state.transactions, data[0]]
+          transactions: [data[0], ...state.transactions]
         }))
       } else {
-        console.error('Error adding transaction:', error)
+        console.error('❌ Erro ao criar transação:', error)
       }
     } catch (error) {
-      console.error('Error adding transaction:', error)
+      console.error('💥 Erro ao adicionar transação:', error)
     }
   },
 
@@ -316,23 +384,34 @@ export const usePokerStore = create<PokerStore>()((set, get) => ({
       const { data: { user } } = await supabase.auth.getUser()
       if (!user) return
 
+      // Mapear campos da UI para o DB
+      const dbUpdates = { ...updates }
+      if (dbUpdates.notes) {
+        dbUpdates.description = dbUpdates.notes
+        delete dbUpdates.notes
+      }
+      delete dbUpdates.tableNumber // Campo só da UI
+
+      console.log('✏️ Atualizando transação:', id, dbUpdates)
+
       const { error } = await supabase
         .from('transactions')
-        .update(updates)
+        .update(dbUpdates)
         .eq('id', id)
         .eq('user_id', user.id)
 
       if (!error) {
+        console.log('✅ Transação atualizada no banco')
         set((state) => ({
           transactions: state.transactions.map((transaction) =>
             transaction.id === id ? { ...transaction, ...updates } : transaction,
           ),
         }))
       } else {
-        console.error('Error updating transaction:', error)
+        console.error('❌ Erro ao atualizar transação:', error)
       }
     } catch (error) {
-      console.error('Error updating transaction:', error)
+      console.error('💥 Erro ao atualizar transação:', error)
     }
   },
 
@@ -341,6 +420,8 @@ export const usePokerStore = create<PokerStore>()((set, get) => ({
       const { data: { user } } = await supabase.auth.getUser()
       if (!user) return
 
+      console.log('🗑️ Deletando transação:', id)
+
       const { error } = await supabase
         .from('transactions')
         .delete()
@@ -348,14 +429,15 @@ export const usePokerStore = create<PokerStore>()((set, get) => ({
         .eq('user_id', user.id)
 
       if (!error) {
+        console.log('✅ Transação deletada do banco')
         set((state) => ({
           transactions: state.transactions.filter((transaction) => transaction.id !== id),
         }))
       } else {
-        console.error('Error deleting transaction:', error)
+        console.error('❌ Erro ao deletar transação:', error)
       }
     } catch (error) {
-      console.error('Error deleting transaction:', error)
+      console.error('💥 Erro ao deletar transação:', error)
     }
   },
 
@@ -365,10 +447,13 @@ export const usePokerStore = create<PokerStore>()((set, get) => ({
       if (!user) return
 
       const newChip = {
-        ...chip,
-        id: crypto.randomUUID(),
+        name: chip.name || `Ficha ${chip.color}`,
+        color: chip.color,
+        value: chip.value,
         user_id: user.id
       }
+
+      console.log('➕ Criando tipo de ficha:', newChip)
 
       const { data, error } = await supabase
         .from('chip_types')
@@ -376,14 +461,17 @@ export const usePokerStore = create<PokerStore>()((set, get) => ({
         .select()
 
       if (!error && data) {
+        console.log('✅ Tipo de ficha criado no banco:', data[0])
+        // Adicionar count para compatibilidade com UI
+        const chipWithCount = { ...data[0], count: chip.count || 0 }
         set((state) => ({
-          chips: [...state.chips, data[0]]
+          chips: [...state.chips, chipWithCount]
         }))
       } else {
-        console.error('Error adding chip type:', error)
+        console.error('❌ Erro ao criar tipo de ficha:', error)
       }
     } catch (error) {
-      console.error('Error adding chip type:', error)
+      console.error('💥 Erro ao adicionar tipo de ficha:', error)
     }
   },
 
@@ -392,23 +480,30 @@ export const usePokerStore = create<PokerStore>()((set, get) => ({
       const { data: { user } } = await supabase.auth.getUser()
       if (!user) return
 
+      // Remove count pois não existe no DB
+      const dbUpdates = { ...updates }
+      delete dbUpdates.count
+
+      console.log('✏️ Atualizando tipo de ficha:', id, dbUpdates)
+
       const { error } = await supabase
         .from('chip_types')
-        .update(updates)
+        .update(dbUpdates)
         .eq('id', id)
         .eq('user_id', user.id)
 
       if (!error) {
+        console.log('✅ Tipo de ficha atualizado no banco')
         set((state) => ({
           chips: state.chips.map((chip) => 
             chip.id === id ? { ...chip, ...updates } : chip
           ),
         }))
       } else {
-        console.error('Error updating chip type:', error)
+        console.error('❌ Erro ao atualizar tipo de ficha:', error)
       }
     } catch (error) {
-      console.error('Error updating chip type:', error)
+      console.error('💥 Erro ao atualizar tipo de ficha:', error)
     }
   },
 
@@ -417,6 +512,8 @@ export const usePokerStore = create<PokerStore>()((set, get) => ({
       const { data: { user } } = await supabase.auth.getUser()
       if (!user) return
 
+      console.log('🗑️ Deletando tipo de ficha:', id)
+
       const { error } = await supabase
         .from('chip_types')
         .delete()
@@ -424,39 +521,25 @@ export const usePokerStore = create<PokerStore>()((set, get) => ({
         .eq('user_id', user.id)
 
       if (!error) {
+        console.log('✅ Tipo de ficha deletado do banco')
         set((state) => ({
           chips: state.chips.filter((chip) => chip.id !== id),
         }))
       } else {
-        console.error('Error deleting chip type:', error)
+        console.error('❌ Erro ao deletar tipo de ficha:', error)
       }
     } catch (error) {
-      console.error('Error deleting chip type:', error)
+      console.error('💥 Erro ao deletar tipo de ficha:', error)
     }
   },
 
   updateChipCount: async (id, count) => {
-    try {
-      const { data: { user } } = await supabase.auth.getUser()
-      if (!user) return
-
-      const { error } = await supabase
-        .from('chip_types')
-        .update({ count })
-        .eq('id', id)
-        .eq('user_id', user.id)
-
-      if (!error) {
-        set((state) => ({
-          chips: state.chips.map((chip) => 
-            chip.id === id ? { ...chip, count } : chip
-          ),
-        }))
-      } else {
-        console.error('Error updating chip count:', error)
-      }
-    } catch (error) {
-      console.error('Error updating chip count:', error)
-    }
+    // Count não existe no DB, só atualiza localmente para compatibilidade com UI
+    console.log('📊 Atualizando count de ficha (local):', id, count)
+    set((state) => ({
+      chips: state.chips.map((chip) => 
+        chip.id === id ? { ...chip, count } : chip
+      ),
+    }))
   },
 }))
