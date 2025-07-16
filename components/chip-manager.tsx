@@ -123,11 +123,13 @@ export function ChipManager() {
   const sortedChips = [...chips].sort((a, b) => a.value - b.value)
 
   return (
-    <div className="space-y-6">
-      <div className="flex justify-between items-center">
+    <div className="space-y-4 sm:space-y-6">
+      <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-4">
         <div>
-          <h2 className="text-2xl font-bold">Gerenciamento de Fichas</h2>
-          <p className="text-muted-foreground">Configure tipos de fichas e gerencie o inventário</p>
+          <h2 className="text-xl sm:text-2xl font-bold">Gerenciamento de Fichas</h2>
+          <p className="text-sm sm:text-base text-muted-foreground">
+            Configure tipos de fichas e gerencie o inventário
+          </p>
         </div>
         <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
           <DialogTrigger asChild>
@@ -136,33 +138,39 @@ export function ChipManager() {
                 setEditingChip(null)
                 setFormData({ color: "", value: "", count: "" })
               }}
+              className="w-full sm:w-auto min-h-[44px] touch-manipulation"
             >
               <Plus className="h-4 w-4 mr-2" />
-              Adicionar Tipo de Ficha
+              <span className="hidden sm:inline">Adicionar Tipo de Ficha</span>
+              <span className="sm:hidden">Adicionar Ficha</span>
             </Button>
           </DialogTrigger>
-          <DialogContent>
+          <DialogContent className="w-[95vw] max-w-md mx-auto">
             <DialogHeader>
-              <DialogTitle>{editingChip ? "Editar Tipo de Ficha" : "Adicionar Novo Tipo de Ficha"}</DialogTitle>
-              <DialogDescription>
+              <DialogTitle className="text-lg sm:text-xl">
+                {editingChip ? "Editar Tipo de Ficha" : "Adicionar Novo Tipo de Ficha"}
+              </DialogTitle>
+              <DialogDescription className="text-sm">
                 {editingChip ? "Atualize os detalhes do tipo de ficha" : "Configure uma nova denominação de ficha"}
               </DialogDescription>
             </DialogHeader>
             <form onSubmit={handleSubmit}>
               <div className="grid gap-4 py-4">
                 <div className="grid gap-2">
-                  <Label htmlFor="color">Cor</Label>
+                  <Label htmlFor="color" className="text-sm font-medium">
+                    Cor
+                  </Label>
                   <Select
                     value={formData.color}
                     onValueChange={(value) => setFormData({ ...formData, color: value })}
                     required
                   >
-                    <SelectTrigger>
+                    <SelectTrigger className="min-h-[44px] touch-manipulation">
                       <SelectValue placeholder="Selecionar cor" />
                     </SelectTrigger>
                     <SelectContent>
                       {chipColors.map((color) => (
-                        <SelectItem key={color.value} value={color.value}>
+                        <SelectItem key={color.value} value={color.value} className="min-h-[44px]">
                           <div className="flex items-center gap-2">
                             <div className={`w-4 h-4 rounded-full ${color.bg} ${color.border} border-2`} />
                             {color.name}
@@ -173,7 +181,9 @@ export function ChipManager() {
                   </Select>
                 </div>
                 <div className="grid gap-2">
-                  <Label htmlFor="value">Valor (R$)</Label>
+                  <Label htmlFor="value" className="text-sm font-medium">
+                    Valor (R$)
+                  </Label>
                   <Input
                     id="value"
                     type="number"
@@ -182,11 +192,14 @@ export function ChipManager() {
                     value={formData.value}
                     onChange={(e) => setFormData({ ...formData, value: e.target.value })}
                     placeholder="1,00"
+                    className="min-h-[44px] touch-manipulation"
                     required
                   />
                 </div>
                 <div className="grid gap-2">
-                  <Label htmlFor="count">Contagem Inicial</Label>
+                  <Label htmlFor="count" className="text-sm font-medium">
+                    Contagem Inicial
+                  </Label>
                   <Input
                     id="count"
                     type="number"
@@ -194,89 +207,116 @@ export function ChipManager() {
                     value={formData.count}
                     onChange={(e) => setFormData({ ...formData, count: e.target.value })}
                     placeholder="100"
+                    className="min-h-[44px] touch-manipulation"
                     required
                   />
                 </div>
               </div>
               <DialogFooter>
-                <Button type="submit">{editingChip ? "Atualizar Tipo de Ficha" : "Adicionar Tipo de Ficha"}</Button>
+                <Button type="submit" className="w-full sm:w-auto min-h-[44px] touch-manipulation">
+                  {editingChip ? "Atualizar Tipo de Ficha" : "Adicionar Tipo de Ficha"}
+                </Button>
               </DialogFooter>
             </form>
           </DialogContent>
         </Dialog>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-        <Card>
-          <CardHeader>
-            <CardTitle>Valor Total das Fichas</CardTitle>
-            <CardDescription>Valor combinado de todas as fichas</CardDescription>
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-6">
+        <Card className="min-h-[100px] sm:min-h-[120px]">
+          <CardHeader className="pb-2">
+            <CardTitle className="text-sm sm:text-base">Valor Total das Fichas</CardTitle>
+            <CardDescription className="text-xs sm:text-sm">Valor combinado de todas as fichas</CardDescription>
           </CardHeader>
           <CardContent>
-            <div className="text-3xl font-bold text-green-600">R${totalChipValue.toFixed(2).replace(".", ",")}</div>
+            <div className="text-2xl sm:text-3xl font-bold text-green-600">
+              R${totalChipValue.toFixed(2).replace(".", ",")}
+            </div>
           </CardContent>
         </Card>
 
-        <Card>
-          <CardHeader>
-            <CardTitle>Contagem Total de Fichas</CardTitle>
-            <CardDescription>Número de fichas físicas</CardDescription>
+        <Card className="min-h-[100px] sm:min-h-[120px]">
+          <CardHeader className="pb-2">
+            <CardTitle className="text-sm sm:text-base">Contagem Total de Fichas</CardTitle>
+            <CardDescription className="text-xs sm:text-sm">Número de fichas físicas</CardDescription>
           </CardHeader>
           <CardContent>
-            <div className="text-3xl font-bold text-blue-600">{totalChipCount}</div>
+            <div className="text-2xl sm:text-3xl font-bold text-blue-600">{totalChipCount}</div>
           </CardContent>
         </Card>
 
-        <Card>
-          <CardHeader>
-            <CardTitle>Tipos de Fichas</CardTitle>
-            <CardDescription>Diferentes denominações</CardDescription>
+        <Card className="min-h-[100px] sm:min-h-[120px] sm:col-span-2 lg:col-span-1">
+          <CardHeader className="pb-2">
+            <CardTitle className="text-sm sm:text-base">Tipos de Fichas</CardTitle>
+            <CardDescription className="text-xs sm:text-sm">Diferentes denominações</CardDescription>
           </CardHeader>
           <CardContent>
-            <div className="text-3xl font-bold text-purple-600">{chips.length}</div>
+            <div className="text-2xl sm:text-3xl font-bold text-purple-600">{chips.length}</div>
           </CardContent>
         </Card>
       </div>
 
-      <div className="grid gap-4">
+      <div className="grid gap-3 sm:gap-4">
         {sortedChips.map((chip) => {
           const colorInfo = getChipColorInfo(chip.color)
           const chipValue = chip.value * chip.count
 
           return (
             <Card key={chip.id}>
-              <CardHeader>
-                <div className="flex justify-between items-start">
+              <CardHeader className="pb-3">
+                <div className="flex flex-col sm:flex-row sm:justify-between sm:items-start gap-3">
                   <div className="flex items-center gap-3">
                     <div
-                      className={`w-12 h-12 rounded-full ${colorInfo.bg} ${colorInfo.border} border-4 flex items-center justify-center shadow-lg`}
+                      className={`w-10 h-10 sm:w-12 sm:h-12 rounded-full ${colorInfo.bg} ${colorInfo.border} border-4 flex items-center justify-center shadow-lg flex-shrink-0`}
                     >
                       <span
-                        className={`text-sm font-bold ${chip.color === "white" || chip.color === "yellow" ? "text-black" : "text-white"}`}
+                        className={`text-xs sm:text-sm font-bold ${
+                          chip.color === "white" || chip.color === "yellow" ? "text-black" : "text-white"
+                        }`}
                       >
                         R${chip.value}
                       </span>
                     </div>
-                    <div>
-                      <CardTitle className="flex items-center gap-2">
-                        Fichas {colorInfo.name}
-                        <Badge variant="outline">R${chip.value}</Badge>
+                    <div className="min-w-0 flex-1">
+                      <CardTitle className="flex flex-col sm:flex-row sm:items-center gap-2 text-base sm:text-lg">
+                        <span>Fichas {colorInfo.name}</span>
+                        <Badge variant="outline" className="text-xs w-fit">
+                          R${chip.value}
+                        </Badge>
                       </CardTitle>
-                      <CardDescription>
+                      <CardDescription className="text-xs sm:text-sm">
                         {chip.count} fichas • Valor total: R${chipValue.toFixed(2).replace(".", ",")}
                       </CardDescription>
                     </div>
                   </div>
-                  <div className="flex gap-2">
-                    <Button variant="outline" size="sm" onClick={() => handleRecount(chip)}>
-                      <RotateCcw className="h-4 w-4 mr-1" />
-                      Recontar
+                  <div className="flex flex-wrap gap-2 sm:flex-nowrap">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => handleRecount(chip)}
+                      className="flex-1 sm:flex-none min-h-[36px] touch-manipulation text-xs"
+                    >
+                      <RotateCcw className="h-3 w-3 mr-1" />
+                      <span className="hidden sm:inline">Recontar</span>
+                      <span className="sm:hidden">Recontar</span>
                     </Button>
-                    <Button variant="outline" size="sm" onClick={() => handleEdit(chip)}>
-                      <Edit className="h-4 w-4" />
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => handleEdit(chip)}
+                      className="min-h-[36px] touch-manipulation"
+                    >
+                      <Edit className="h-3 w-3 sm:h-4 sm:w-4" />
+                      <span className="sr-only">Editar</span>
                     </Button>
-                    <Button variant="outline" size="sm" onClick={() => handleDelete(chip.id)}>
-                      <Trash2 className="h-4 w-4" />
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => handleDelete(chip.id)}
+                      className="min-h-[36px] touch-manipulation"
+                    >
+                      <Trash2 className="h-3 w-3 sm:h-4 sm:w-4" />
+                      <span className="sr-only">Excluir</span>
                     </Button>
                   </div>
                 </div>
@@ -286,8 +326,8 @@ export function ChipManager() {
         })}
         {chips.length === 0 && (
           <Card>
-            <CardContent className="text-center py-8">
-              <p className="text-muted-foreground">
+            <CardContent className="text-center py-8 sm:py-12">
+              <p className="text-sm sm:text-base text-muted-foreground">
                 Nenhum tipo de ficha configurado ainda. Adicione seu primeiro tipo de ficha para começar!
               </p>
             </CardContent>
@@ -296,15 +336,17 @@ export function ChipManager() {
       </div>
 
       <Dialog open={isRecountDialogOpen} onOpenChange={setIsRecountDialogOpen}>
-        <DialogContent>
+        <DialogContent className="w-[95vw] max-w-md mx-auto">
           <DialogHeader>
-            <DialogTitle>Recontar Fichas</DialogTitle>
-            <DialogDescription>Atualize a contagem atual para este tipo de ficha</DialogDescription>
+            <DialogTitle className="text-lg sm:text-xl">Recontar Fichas</DialogTitle>
+            <DialogDescription className="text-sm">Atualize a contagem atual para este tipo de ficha</DialogDescription>
           </DialogHeader>
           <form onSubmit={handleRecountSubmit}>
             <div className="grid gap-4 py-4">
               <div className="grid gap-2">
-                <Label htmlFor="recountValue">Nova Contagem</Label>
+                <Label htmlFor="recountValue" className="text-sm font-medium">
+                  Nova Contagem
+                </Label>
                 <Input
                   id="recountValue"
                   type="number"
@@ -312,12 +354,15 @@ export function ChipManager() {
                   value={recountValue}
                   onChange={(e) => setRecountValue(e.target.value)}
                   placeholder="Insira a nova contagem"
+                  className="min-h-[44px] touch-manipulation"
                   required
                 />
               </div>
             </div>
             <DialogFooter>
-              <Button type="submit">Atualizar Contagem</Button>
+              <Button type="submit" className="w-full sm:w-auto min-h-[44px] touch-manipulation">
+                Atualizar Contagem
+              </Button>
             </DialogFooter>
           </form>
         </DialogContent>

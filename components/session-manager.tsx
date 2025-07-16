@@ -19,7 +19,8 @@ import {
   DialogTrigger,
 } from "@/components/ui/dialog"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { Plus, Edit, Trash2, Play, Square, Calculator } from "lucide-react"
+import { Plus, Edit, Trash2, Play, Square, Calculator, MoreVertical } from "lucide-react"
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
 import { usePokerStore } from "@/lib/store"
 import { useToast } from "@/hooks/use-toast"
 import { SettleUp } from "./settle-up"
@@ -92,11 +93,11 @@ export function SessionManager() {
   }
 
   return (
-    <div className="space-y-6">
-      <div className="flex justify-between items-center">
+    <div className="space-y-4 sm:space-y-6">
+      <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-4">
         <div>
-          <h2 className="text-2xl font-bold">Gerenciamento de Sessões</h2>
-          <p className="text-muted-foreground">Crie e gerencie suas sessões de poker</p>
+          <h2 className="text-xl sm:text-2xl font-bold">Gerenciamento de Sessões</h2>
+          <p className="text-sm text-muted-foreground">Crie e gerencie suas sessões de poker</p>
         </div>
         <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
           <DialogTrigger asChild>
@@ -105,37 +106,43 @@ export function SessionManager() {
                 setEditingSession(null)
                 setFormData({ name: "", tableCount: 1, notes: "" })
               }}
+              className="w-full sm:w-auto"
             >
               <Plus className="h-4 w-4 mr-2" />
               Nova Sessão
             </Button>
           </DialogTrigger>
-          <DialogContent>
+          <DialogContent className="w-[95vw] max-w-md mx-auto">
             <DialogHeader>
-              <DialogTitle>{editingSession ? "Editar Sessão" : "Criar Nova Sessão"}</DialogTitle>
-              <DialogDescription>
+              <DialogTitle className="text-lg">{editingSession ? "Editar Sessão" : "Criar Nova Sessão"}</DialogTitle>
+              <DialogDescription className="text-sm">
                 {editingSession ? "Atualize os detalhes da sessão" : "Insira os detalhes para sua nova sessão de poker"}
               </DialogDescription>
             </DialogHeader>
             <form onSubmit={handleSubmit}>
               <div className="grid gap-4 py-4">
                 <div className="grid gap-2">
-                  <Label htmlFor="name">Nome da Sessão</Label>
+                  <Label htmlFor="name" className="text-sm font-medium">
+                    Nome da Sessão
+                  </Label>
                   <Input
                     id="name"
                     value={formData.name}
                     onChange={(e) => setFormData({ ...formData, name: e.target.value })}
                     placeholder="Poker da Sexta à Noite"
                     required
+                    className="text-base"
                   />
                 </div>
                 <div className="grid gap-2">
-                  <Label htmlFor="tableCount">Número de Mesas</Label>
+                  <Label htmlFor="tableCount" className="text-sm font-medium">
+                    Número de Mesas
+                  </Label>
                   <Select
                     value={formData.tableCount.toString()}
                     onValueChange={(value) => setFormData({ ...formData, tableCount: Number.parseInt(value) })}
                   >
-                    <SelectTrigger>
+                    <SelectTrigger className="text-base">
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
@@ -148,17 +155,22 @@ export function SessionManager() {
                   </Select>
                 </div>
                 <div className="grid gap-2">
-                  <Label htmlFor="notes">Notas (Opcional)</Label>
+                  <Label htmlFor="notes" className="text-sm font-medium">
+                    Notas (Opcional)
+                  </Label>
                   <Textarea
                     id="notes"
                     value={formData.notes}
                     onChange={(e) => setFormData({ ...formData, notes: e.target.value })}
                     placeholder="Notas da sessão..."
+                    className="text-base min-h-[80px]"
                   />
                 </div>
               </div>
-              <DialogFooter>
-                <Button type="submit">{editingSession ? "Atualizar Sessão" : "Criar Sessão"}</Button>
+              <DialogFooter className="flex-col sm:flex-row gap-2">
+                <Button type="submit" className="w-full sm:w-auto">
+                  {editingSession ? "Atualizar Sessão" : "Criar Sessão"}
+                </Button>
               </DialogFooter>
             </form>
           </DialogContent>
@@ -168,25 +180,25 @@ export function SessionManager() {
       <div className="grid gap-4">
         {sessions.map((session) => (
           <Card key={session.id}>
-            <CardHeader>
-              <div className="flex justify-between items-start">
-                <div>
-                  <CardTitle className="flex items-center gap-2">
-                    {session.name}
-                    <Badge variant={session.status === "active" ? "default" : "secondary"}>
+            <CardHeader className="pb-3">
+              <div className="flex flex-col sm:flex-row sm:justify-between sm:items-start gap-3">
+                <div className="min-w-0 flex-1">
+                  <CardTitle className="flex items-center gap-2 text-base sm:text-lg">
+                    <span className="truncate">{session.name}</span>
+                    <Badge variant={session.status === "active" ? "default" : "secondary"} className="text-xs shrink-0">
                       {session.status === "active" ? "Ativa" : "Concluída"}
                     </Badge>
                   </CardTitle>
-                  <CardDescription>
-                    Criada em: {new Date(session.createdAt).toLocaleString("pt-BR")}
+                  <CardDescription className="text-xs sm:text-sm">
+                    <div>Criada em: {new Date(session.createdAt).toLocaleString("pt-BR")}</div>
                     {session.completedAt && (
-                      <span className="ml-4">
-                        Concluída em: {new Date(session.completedAt).toLocaleString("pt-BR")}
-                      </span>
+                      <div className="mt-1">Concluída em: {new Date(session.completedAt).toLocaleString("pt-BR")}</div>
                     )}
                   </CardDescription>
                 </div>
-                <div className="flex gap-2">
+
+                {/* Desktop Actions */}
+                <div className="hidden sm:flex gap-2">
                   <Button variant="outline" size="sm" onClick={() => toggleSessionStatus(session)}>
                     {session.status === "active" ? (
                       <>
@@ -211,9 +223,47 @@ export function SessionManager() {
                     <Trash2 className="h-4 w-4" />
                   </Button>
                 </div>
+
+                {/* Mobile Actions */}
+                <div className="sm:hidden">
+                  <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                      <Button variant="outline" size="sm">
+                        <MoreVertical className="h-4 w-4" />
+                      </Button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent align="end" className="w-48">
+                      <DropdownMenuItem onClick={() => toggleSessionStatus(session)}>
+                        {session.status === "active" ? (
+                          <>
+                            <Square className="h-4 w-4 mr-2" />
+                            Concluir Sessão
+                          </>
+                        ) : (
+                          <>
+                            <Play className="h-4 w-4 mr-2" />
+                            Reativar Sessão
+                          </>
+                        )}
+                      </DropdownMenuItem>
+                      <DropdownMenuItem onClick={() => setSettleUpSession(session.id)}>
+                        <Calculator className="h-4 w-4 mr-2" />
+                        Acertar Contas
+                      </DropdownMenuItem>
+                      <DropdownMenuItem onClick={() => handleEdit(session)}>
+                        <Edit className="h-4 w-4 mr-2" />
+                        Editar
+                      </DropdownMenuItem>
+                      <DropdownMenuItem onClick={() => handleDelete(session.id)} className="text-red-600">
+                        <Trash2 className="h-4 w-4 mr-2" />
+                        Excluir
+                      </DropdownMenuItem>
+                    </DropdownMenuContent>
+                  </DropdownMenu>
+                </div>
               </div>
             </CardHeader>
-            <CardContent>
+            <CardContent className="pt-0">
               <div className="grid grid-cols-2 gap-4 text-sm">
                 <div>
                   <span className="font-medium">Mesas:</span> {session.tableCount}
@@ -223,7 +273,8 @@ export function SessionManager() {
                 </div>
                 {session.notes && (
                   <div className="col-span-2">
-                    <span className="font-medium">Notas:</span> {session.notes}
+                    <span className="font-medium">Notas:</span>
+                    <p className="mt-1 text-muted-foreground break-words">{session.notes}</p>
                   </div>
                 )}
               </div>
@@ -233,7 +284,7 @@ export function SessionManager() {
         {sessions.length === 0 && (
           <Card>
             <CardContent className="text-center py-8">
-              <p className="text-muted-foreground">
+              <p className="text-muted-foreground text-sm">
                 Nenhuma sessão criada ainda. Crie sua primeira sessão para começar!
               </p>
             </CardContent>

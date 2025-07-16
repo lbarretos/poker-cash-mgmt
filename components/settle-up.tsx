@@ -1,19 +1,24 @@
 "use client"
 
-import { useState, useMemo } from "react"
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
+import type React from "react"
+
+import { useMemo, useState } from "react"
+import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
-import { Badge } from "@/components/ui/badge"
 import { Separator } from "@/components/ui/separator"
-import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import { ArrowRight, TrendingUp, TrendingDown, Users, Calculator, CheckCircle, AlertCircle, Coins } from "lucide-react"
+import { AlertCircle, ArrowRight, Calculator, CheckCircle, Coins, TrendingDown, TrendingUp, Users } from "lucide-react"
 import { usePokerStore } from "@/lib/store"
 import { useToast } from "@/hooks/use-toast"
 
+/* ------------------------------------------------------------------------- */
+/* Types */
+/* ------------------------------------------------------------------------- */
 interface SettleUpProps {
   sessionId: string
   onClose: () => void
@@ -43,51 +48,57 @@ interface ChipCount {
   chipValue: number
 }
 
+/* ------------------------------------------------------------------------- */
+/* Component */
+/* ------------------------------------------------------------------------- */
 export function SettleUp({ sessionId, onClose }: SettleUpProps) {
+  /* --------------------------------------------------------------------- */
+  /* Store + UI helpers */
+  /* --------------------------------------------------------------------- */
   const { sessions, players, transactions, chips } = usePokerStore()
   const { toast } = useToast()
-  const [activeTab, setActiveTab] = useState("overview")
+
+  /* --------------------------------------------------------------------- */
+  /* Local state */
+  /* --------------------------------------------------------------------- */
+  const [activeTab, setActiveTab] = useState<"overview" | "chip-counts" | "settlement">("overview")
   const [chipCounts, setChipCounts] = useState<ChipCount[]>([])
   const [chipCountsEntered, setChipCountsEntered] = useState(false)
 
+  /* --------------------------------------------------------------------- */
+  /* Derived data */
+  /* --------------------------------------------------------------------- */
   const session = sessions.find((s) => s.id === sessionId)
   const sessionTransactions = transactions.filter((t) => t.sessionId === sessionId)
 
-  // Get all players who participated in this session
+  /* players that played */
   const sessionPlayers = useMemo(() => {
-    const playerIds = new Set(sessionTransactions.map((t) => t.playerId))
-    return Array.from(playerIds).map((id) => {
-      const player = players.find((p) => p.id === id)
-      return {
-        id,
-        name: player?.name || "Jogador Desconhecido",
-      }
-    })
+    const ids = new Set(sessionTransactions.map((t) => t.playerId))
+    return Array.from(ids).map((id) => ({
+      id,
+      name: players.find((p) => p.id === id)?.name ?? "Jogador Desconhecido",
+    }))
   }, [sessionTransactions, players])
 
-  // Initialize chip counts when component mounts
+  /* initialise chip counts on first render */
   useMemo(() => {
-    if (chipCounts.length === 0 && sessionPlayers.length > 0) {
-      setChipCounts(
-        sessionPlayers.map((player) => ({
-          playerId: player.id,
-          chipValue: 0,
-        })),
-      )
+    if (chipCounts.length === 0 && sessionPlayers.length) {
+      setChipCounts(sessionPlayers.map((p) => ({ playerId: p.id, chipValue: 0 })))
     }
-  }, [sessionPlayers, chipCounts.length])
+  }, [chipCounts.length, sessionPlayers])
 
-  // Calculate player balances including final chip values
-  const playerBalances = useMemo(() => {
-    const balanceMap = new Map<string, PlayerBalance>()
+  /* ------------------------------------------------------------ */
+  /* Player balances incl. chip value                              */
+  /* ------------------------------------------------------------ */
+  const playerBalances = useMemo<PlayerBalance[]>(() => {
+    const map = new Map<string, PlayerBalance>()
 
-    // Initialize all players who participated in this session
-    sessionTransactions.forEach((transaction) => {
-      const player = players.find((p) => p.id === transaction.playerId)
-      if (!balanceMap.has(transaction.playerId)) {
-        balanceMap.set(transaction.playerId, {
-          playerId: transaction.playerId,
-          playerName: player?.name || "Jogador Desconhecido",
+    /* seed balances */
+    sessionTransactions.forEach((t) => {
+      if (!map.has(t.playerId)) {
+        map.set(t.playerId, {
+          playerId: t.playerId,
+          playerName: players.find((p) => p.id === t.playerId)?.name ?? "Jogador Desconhecido",
           buyIns: 0,
           cashOuts: 0,
           payments: 0,
@@ -98,100 +109,86 @@ export function SettleUp({ sessionId, onClose }: SettleUpProps) {
       }
     })
 
-    // Calculate totals for each player
-    sessionTransactions.forEach((transaction) => {
-      const balance = balanceMap.get(transaction.playerId)!
-      balance.transactionCount++
-
-      switch (transaction.type) {
-        case "buy-in":
-          balance.buyIns += transaction.amount
-          break
-        case "cash-out":
-          balance.cashOuts += transaction.amount
-          break
-        case "payment":
-          balance.payments += transaction.amount
-          break
-      }
+    /* accumulate transactions */
+    sessionTransactions.forEach((t) => {
+      const bal = map.get(t.playerId)!
+      bal.transactionCount += 1
+      if (t.type === "buy-in") bal.buyIns += t.amount
+      if (t.type === "cash-out") bal.cashOuts += t.amount
+      if (t.type === "payment") bal.payments += t.amount
     })
 
-    // Add final chip values
-    chipCounts.forEach((chipCount) => {
-      const balance = balanceMap.get(chipCount.playerId)
-      if (balance) {
-        balance.finalChipValue = chipCount.chipValue
-      }
+    /* merge chip counts */
+    chipCounts.forEach((c) => {
+      const bal = map.get(c.playerId)
+      if (bal) bal.finalChipValue = c.chipValue
     })
 
-    // Calculate net positions (positive = owed money, negative = owes money)
-    // Net position = (cash-outs + final chip value) - buy-ins + payments
-    // Positive = player should receive money, Negative = player owes money
-    balanceMap.forEach((balance) => {
-      balance.netPosition = balance.cashOuts + balance.finalChipValue - balance.buyIns + balance.payments
+    /* compute net */
+    map.forEach((bal) => {
+      bal.netPosition = bal.cashOuts + bal.finalChipValue - bal.buyIns + bal.payments
     })
 
-    return Array.from(balanceMap.values()).sort((a, b) => b.netPosition - a.netPosition)
+    return Array.from(map.values()).sort((a, b) => b.netPosition - a.netPosition)
   }, [sessionTransactions, players, chipCounts])
 
-  // Calculate optimal settlements using chip-based settlement
-  const optimalSettlements = useMemo(() => {
+  /* ------------------------------------------------------------ */
+  /* Optimal settlements                                          */
+  /* ------------------------------------------------------------ */
+  const optimalSettlements = useMemo<Settlement[]>(() => {
     if (!chipCountsEntered) return []
 
-    const settlements: Settlement[] = []
     const creditors = playerBalances.filter((p) => p.netPosition > 0).map((p) => ({ ...p }))
     const debtors = playerBalances.filter((p) => p.netPosition < 0).map((p) => ({ ...p }))
+    const results: Settlement[] = []
 
-    let creditorIndex = 0
-    let debtorIndex = 0
+    let ci = 0,
+      di = 0
+    while (ci < creditors.length && di < debtors.length) {
+      const creditor = creditors[ci]
+      const debtor = debtors[di]
+      const amt = Math.min(creditor.netPosition, Math.abs(debtor.netPosition))
 
-    while (creditorIndex < creditors.length && debtorIndex < debtors.length) {
-      const creditor = creditors[creditorIndex]
-      const debtor = debtors[debtorIndex]
-
-      const settlementAmount = Math.min(creditor.netPosition, Math.abs(debtor.netPosition))
-
-      if (settlementAmount > 0.01) {
-        settlements.push({
+      if (amt > 0.01) {
+        results.push({
           from: debtor.playerId,
           fromName: debtor.playerName,
           to: creditor.playerId,
           toName: creditor.playerName,
-          amount: settlementAmount,
+          amount: amt,
         })
-
-        creditor.netPosition -= settlementAmount
-        debtor.netPosition += settlementAmount
+        creditor.netPosition -= amt
+        debtor.netPosition += amt
       }
 
-      if (Math.abs(creditor.netPosition) < 0.01) creditorIndex++
-      if (Math.abs(debtor.netPosition) < 0.01) debtorIndex++
+      if (creditor.netPosition < 0.01) ci++
+      if (Math.abs(debtor.netPosition) < 0.01) di++
     }
+    return results
+  }, [chipCountsEntered, playerBalances])
 
-    return settlements
-  }, [playerBalances, chipCountsEntered])
+  /* ------------------------------------------------------------ */
+  /* Aggregates                                                   */
+  /* ------------------------------------------------------------ */
+  const totalBuyIns = sessionTransactions.filter((t) => t.type === "buy-in").reduce((s, t) => s + t.amount, 0)
+  const totalCashOuts = sessionTransactions.filter((t) => t.type === "cash-out").reduce((s, t) => s + t.amount, 0)
+  const totalPayments = sessionTransactions.filter((t) => t.type === "payment").reduce((s, t) => s + t.amount, 0)
+  const totalFinalChipValue = chipCounts.reduce((s, c) => s + c.chipValue, 0)
 
-  // Calculate summary statistics
-  const totalBuyIns = sessionTransactions.filter((t) => t.type === "buy-in").reduce((sum, t) => sum + t.amount, 0)
-  const totalCashOuts = sessionTransactions.filter((t) => t.type === "cash-out").reduce((sum, t) => sum + t.amount, 0)
-  const totalPayments = sessionTransactions.filter((t) => t.type === "payment").reduce((sum, t) => sum + t.amount, 0)
-  const totalFinalChipValue = chipCounts.reduce((sum, c) => sum + c.chipValue, 0)
-
-  // For chip-based settlement, the balance should be:
-  // Total buy-ins = Total cash-outs + Total final chip value - Total payments
   const expectedBalance = totalBuyIns + totalPayments
   const actualBalance = totalCashOuts + totalFinalChipValue
   const netDifference = actualBalance - expectedBalance
   const isBalanced = Math.abs(netDifference) < 0.01
 
-  const handleChipCountChange = (playerId: string, value: string) => {
-    const numValue = Number.parseFloat(value.replace(",", ".")) || 0 // Replace comma with dot for parsing
-    setChipCounts((prev) =>
-      prev.map((count) => (count.playerId === playerId ? { ...count, chipValue: numValue } : count)),
-    )
+  /* --------------------------------------------------------------------- */
+  /* Handlers                                                              */
+  /* --------------------------------------------------------------------- */
+  const updateChipCount = (id: string, value: string) => {
+    const num = Number.parseFloat(value.replace(",", ".")) || 0
+    setChipCounts((prev) => prev.map((c) => (c.playerId === id ? { ...c, chipValue: num } : c)))
   }
 
-  const handleCalculateSettlement = () => {
+  const calculateSettlement = () => {
     if (chipCounts.some((c) => c.chipValue < 0)) {
       toast({
         title: "Valores de ficha inválidos",
@@ -200,407 +197,397 @@ export function SettleUp({ sessionId, onClose }: SettleUpProps) {
       })
       return
     }
-
     setChipCountsEntered(true)
     setActiveTab("settlement")
     toast({
       title: "Acerto de contas calculado",
-      description: "As contagens finais de fichas foram processadas e o acerto de contas calculado.",
+      description: "Contagens finais de fichas processadas com sucesso.",
     })
   }
 
-  const handleCopySettlement = () => {
-    const settlementText = optimalSettlements
+  const copySettlement = () => {
+    const text = optimalSettlements
       .map((s) => `${s.fromName} paga ${s.toName}: R$${s.amount.toFixed(2).replace(".", ",")}`)
       .join("\n")
-
-    navigator.clipboard.writeText(settlementText)
-    toast({
-      title: "Acerto de contas copiado",
-      description: "Os detalhes do acerto de contas foram copiados para a área de transferência.",
-    })
+    navigator.clipboard.writeText(text)
+    toast({ title: "Acerto copiado", description: "Detalhes copiados para a área de transferência." })
   }
 
   const resetChipCounts = () => {
-    setChipCounts(
-      sessionPlayers.map((player) => ({
-        playerId: player.id,
-        chipValue: 0,
-      })),
-    )
+    setChipCounts(sessionPlayers.map((p) => ({ playerId: p.id, chipValue: 0 })))
     setChipCountsEntered(false)
     setActiveTab("chip-counts")
   }
 
-  if (!session) {
-    return null
-  }
+  /* --------------------------------------------------------------------- */
+  /* Guard                                                                  */
+  /* --------------------------------------------------------------------- */
+  if (!session) return null
 
+  /* --------------------------------------------------------------------- */
+  /* UI                                                                     */
+  /* --------------------------------------------------------------------- */
   return (
-    <Dialog open={true} onOpenChange={onClose}>
-      <DialogContent className="max-w-5xl max-h-[90vh] overflow-y-auto">
+    <Dialog open onOpenChange={onClose}>
+      <DialogContent className="max-w-5xl w-[95vw] h-[90vh] overflow-y-auto">
+        {/* ----------------------------------------------------------------- */}
+        {/* Header                                                            */}
+        {/* ----------------------------------------------------------------- */}
         <DialogHeader>
-          <DialogTitle className="flex items-center gap-2">
-            <Calculator className="h-5 w-5" />
-            Acertar Contas - {session.name}
+          <DialogTitle className="flex items-center gap-2 text-base sm:text-lg">
+            <Calculator className="size-4 sm:size-5" />
+            <span className="truncate">Acertar Contas – {session.name}</span>
           </DialogTitle>
-          <DialogDescription>
+          <DialogDescription className="text-sm">
             Insira as contagens finais de fichas e calcule os acertos entre jogadores
           </DialogDescription>
         </DialogHeader>
 
-        <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
-          <TabsList className="grid w-full grid-cols-3">
-            <TabsTrigger value="overview">Visão Geral</TabsTrigger>
-            <TabsTrigger value="chip-counts">Contagem Final de Fichas</TabsTrigger>
-            <TabsTrigger value="settlement" disabled={!chipCountsEntered}>
-              Acerto de Contas
+        {/* ----------------------------------------------------------------- */}
+        {/* Tabs                                                              */}
+        {/* ----------------------------------------------------------------- */}
+        <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as any)} className="space-y-4 sm:space-y-6">
+          <TabsList className="grid grid-cols-3 gap-px bg-muted rounded-lg">
+            <TabsTrigger value="overview" className="py-2 text-xs sm:text-sm">
+              <span className="hidden sm:inline">Visão Geral</span>
+              <span className="sm:hidden">📊</span>
+            </TabsTrigger>
+            <TabsTrigger value="chip-counts" className="py-2 text-xs sm:text-sm">
+              <span className="hidden sm:inline">Fichas</span>
+              <span className="sm:hidden">🪙</span>
+            </TabsTrigger>
+            <TabsTrigger
+              value="settlement"
+              disabled={!chipCountsEntered}
+              className="py-2 text-xs sm:text-sm disabled:opacity-50"
+            >
+              <span className="hidden sm:inline">Acerto</span>
+              <span className="sm:hidden">💰</span>
             </TabsTrigger>
           </TabsList>
 
-          <TabsContent value="overview" className="space-y-6">
-            {/* Session Summary */}
-            <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-              <Card>
-                <CardHeader className="pb-2">
-                  <CardTitle className="text-sm font-medium flex items-center gap-2">
-                    <Users className="h-4 w-4" />
-                    Jogadores
-                  </CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <div className="text-2xl font-bold">{sessionPlayers.length}</div>
-                </CardContent>
-              </Card>
-
-              <Card>
-                <CardHeader className="pb-2">
-                  <CardTitle className="text-sm font-medium flex items-center gap-2">
-                    <TrendingDown className="h-4 w-4 text-red-500" />
-                    Total de Buy-ins
-                  </CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <div className="text-2xl font-bold text-red-600">R${totalBuyIns.toFixed(2).replace(".", ",")}</div>
-                </CardContent>
-              </Card>
-
-              <Card>
-                <CardHeader className="pb-2">
-                  <CardTitle className="text-sm font-medium flex items-center gap-2">
-                    <TrendingUp className="h-4 w-4 text-green-500" />
-                    Total de Cash-outs
-                  </CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <div className="text-2xl font-bold text-green-600">
-                    R${totalCashOuts.toFixed(2).replace(".", ",")}
-                  </div>
-                </CardContent>
-              </Card>
-
-              <Card>
-                <CardHeader className="pb-2">
-                  <CardTitle className="text-sm font-medium flex items-center gap-2">
-                    <Coins className="h-4 w-4 text-blue-500" />
-                    Fichas Finais
-                  </CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <div className="text-2xl font-bold text-blue-600">
-                    R${totalFinalChipValue.toFixed(2).replace(".", ",")}
-                  </div>
-                  <p className="text-xs text-muted-foreground mt-1">
-                    {chipCountsEntered ? "Inserido" : "Não inserido"}
-                  </p>
-                </CardContent>
-              </Card>
+          {/* --------------------------------------------------------------- */}
+          {/* Overview                                                        */}
+          {/* --------------------------------------------------------------- */}
+          <TabsContent value="overview" className="space-y-4 sm:space-y-6">
+            {/* Summary cards */}
+            <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
+              {/* Players */}
+              <SummaryCard
+                title="Jogadores"
+                icon={<Users className="size-3 sm:size-4" />}
+                value={sessionPlayers.length}
+              />
+              {/* Buy-ins */}
+              <SummaryCard
+                title="Buy-ins"
+                icon={<TrendingDown className="size-3 sm:size-4 text-red-500" />}
+                value={`R$${totalBuyIns.toFixed(2).replace(".", ",")}`}
+                valueClass="text-red-600"
+              />
+              {/* Cash-outs */}
+              <SummaryCard
+                title="Cash-outs"
+                icon={<TrendingUp className="size-3 sm:size-4 text-green-500" />}
+                value={`R$${totalCashOuts.toFixed(2).replace(".", ",")}`}
+                valueClass="text-green-600"
+              />
+              {/* Chips */}
+              <SummaryCard
+                title="Fichas"
+                icon={<Coins className="size-3 sm:size-4 text-blue-500" />}
+                value={`R$${totalFinalChipValue.toFixed(2).replace(".", ",")}`}
+                valueClass="text-blue-600"
+                footer={chipCountsEntered ? "Inserido" : "Não inserido"}
+              />
             </div>
 
-            {/* Transaction Summary */}
+            {/* Transaction summary */}
             <Card>
               <CardHeader>
-                <CardTitle>Resumo das Transações</CardTitle>
-                <CardDescription>Visão geral de todas as transações nesta sessão</CardDescription>
+                <CardTitle className="text-base sm:text-lg">Resumo das Transações</CardTitle>
+                <CardDescription className="text-sm">Visão geral de todas as transações</CardDescription>
               </CardHeader>
               <CardContent>
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead>Jogador</TableHead>
-                      <TableHead className="text-right">Buy-ins</TableHead>
-                      <TableHead className="text-right">Cash-outs</TableHead>
-                      <TableHead className="text-right">Pagamentos</TableHead>
-                      <TableHead className="text-right">Transações</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {playerBalances.map((balance) => (
-                      <TableRow key={balance.playerId}>
-                        <TableCell className="font-medium">{balance.playerName}</TableCell>
-                        <TableCell className="text-right text-red-600">
-                          R${balance.buyIns.toFixed(2).replace(".", ",")}
-                        </TableCell>
-                        <TableCell className="text-right text-green-600">
-                          R${balance.cashOuts.toFixed(2).replace(".", ",")}
-                        </TableCell>
-                        <TableCell className="text-right text-blue-600">
-                          R${balance.payments.toFixed(2).replace(".", ",")}
-                        </TableCell>
-                        <TableCell className="text-right">{balance.transactionCount}</TableCell>
+                {/* Mobile – cards */}
+                <div className="sm:hidden space-y-3">
+                  {playerBalances.map((p) => (
+                    <TransactionCard key={p.playerId} balance={p} />
+                  ))}
+                </div>
+                {/* Desktop – table */}
+                <div className="hidden sm:block overflow-x-auto">
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>Jogador</TableHead>
+                        <TableHead className="text-right">Buy-ins</TableHead>
+                        <TableHead className="text-right">Cash-outs</TableHead>
+                        <TableHead className="text-right">Pagamentos</TableHead>
+                        <TableHead className="text-right">Transações</TableHead>
                       </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
+                    </TableHeader>
+                    <TableBody>
+                      {playerBalances.map((b) => (
+                        <TableRow key={b.playerId}>
+                          <TableCell className="font-medium">{b.playerName}</TableCell>
+                          <TableCell className="text-right text-red-600">
+                            R${b.buyIns.toFixed(2).replace(".", ",")}
+                          </TableCell>
+                          <TableCell className="text-right text-green-600">
+                            R${b.cashOuts.toFixed(2).replace(".", ",")}
+                          </TableCell>
+                          <TableCell className="text-right text-blue-600">
+                            R${b.payments.toFixed(2).replace(".", ",")}
+                          </TableCell>
+                          <TableCell className="text-right">{b.transactionCount}</TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                </div>
               </CardContent>
             </Card>
 
             <div className="text-center">
-              <Button onClick={() => setActiveTab("chip-counts")} size="lg">
-                <Coins className="h-4 w-4 mr-2" />
+              <Button onClick={() => setActiveTab("chip-counts")} size="lg" className="w-full sm:w-auto">
+                <Coins className="size-4 mr-2" />
                 Inserir Contagens Finais de Fichas
               </Button>
             </div>
           </TabsContent>
 
-          <TabsContent value="chip-counts" className="space-y-6">
+          {/* --------------------------------------------------------------- */}
+          {/* Chip counts                                                     */}
+          {/* --------------------------------------------------------------- */}
+          <TabsContent value="chip-counts" className="space-y-4 sm:space-y-6">
             <Card>
               <CardHeader>
-                <CardTitle>Inserir Contagens Finais de Fichas</CardTitle>
-                <CardDescription>
-                  Insira o valor total das fichas que cada jogador tem no final da sessão
-                </CardDescription>
+                <CardTitle className="text-base sm:text-lg">Inserir Contagens Finais de Fichas</CardTitle>
+                <CardDescription className="text-sm">Informe o valor total das fichas de cada jogador</CardDescription>
               </CardHeader>
-              <CardContent>
-                <div className="grid gap-4">
-                  {sessionPlayers.map((player) => {
-                    const chipCount = chipCounts.find((c) => c.playerId === player.id)
-                    return (
-                      <div key={player.id} className="flex items-center gap-4">
-                        <Label className="w-32 font-medium">{player.name}</Label>
-                        <div className="flex items-center gap-2">
-                          <span className="text-sm text-muted-foreground">R$</span>
-                          <Input
-                            type="text" // Use text to allow comma input
-                            inputMode="decimal"
-                            value={chipCount?.chipValue.toFixed(2).replace(".", ",") || ""}
-                            onChange={(e) => handleChipCountChange(player.id, e.target.value)}
-                            placeholder="0,00"
-                            className="w-32"
-                          />
-                        </div>
+              <CardContent className="space-y-4">
+                {sessionPlayers.map((p) => {
+                  const value = chipCounts.find((c) => c.playerId === p.id)?.chipValue ?? 0
+                  return (
+                    <div key={p.id} className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-4 text-sm">
+                      <Label className="font-medium sm:w-32">{p.name}</Label>
+                      <div className="flex items-center gap-1">
+                        <span className="text-muted-foreground">R$</span>
+                        <Input
+                          type="text"
+                          inputMode="decimal"
+                          className="w-full sm:w-32"
+                          placeholder="0,00"
+                          value={value.toFixed(2).replace(".", ",")}
+                          onChange={(e) => updateChipCount(p.id, e.target.value)}
+                        />
                       </div>
-                    )
-                  })}
-                </div>
-
-                <Separator className="my-6" />
-
-                <div className="flex items-center justify-between">
-                  <div>
-                    <div className="text-sm font-medium">Valor Total Final das Fichas</div>
-                    <div className="text-2xl font-bold text-blue-600">
-                      R${totalFinalChipValue.toFixed(2).replace(".", ",")}
                     </div>
+                  )
+                })}
+
+                <Separator className="my-4" />
+
+                <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+                  <div>
+                    <p className="text-sm font-medium">Total Final de Fichas</p>
+                    <p className="text-xl sm:text-2xl font-bold text-blue-600">
+                      R${totalFinalChipValue.toFixed(2).replace(".", ",")}
+                    </p>
                   </div>
-                  <div className="flex gap-2">
-                    <Button variant="outline" onClick={resetChipCounts}>
+
+                  <div className="flex flex-col sm:flex-row gap-2 w-full sm:w-auto">
+                    <Button variant="outline" onClick={resetChipCounts} className="w-full sm:w-auto bg-transparent">
                       Redefinir
                     </Button>
-                    <Button onClick={handleCalculateSettlement}>Calcular Acerto de Contas</Button>
+                    <Button onClick={calculateSettlement} className="w-full sm:w-auto">
+                      Calcular Acerto
+                    </Button>
                   </div>
                 </div>
               </CardContent>
             </Card>
 
-            {/* Quick chip value calculator */}
-            <Card>
-              <CardHeader>
-                <CardTitle>Calculadora de Valor de Fichas</CardTitle>
-                <CardDescription>Use seus tipos de fichas configurados para calcular valores</CardDescription>
-              </CardHeader>
-              <CardContent>
-                <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                  {chips.map((chip) => (
-                    <div key={chip.id} className="text-center p-3 border rounded-lg">
-                      <div className="text-sm font-medium">{chip.color}</div>
-                      <div className="text-lg font-bold">R${chip.value.toFixed(2).replace(".", ",")}</div>
-                    </div>
-                  ))}
-                </div>
-              </CardContent>
-            </Card>
+            {chips.length > 0 && (
+              <Card>
+                <CardHeader>
+                  <CardTitle className="text-base sm:text-lg">Calculadora de Valor de Fichas</CardTitle>
+                  <CardDescription className="text-sm">
+                    Use seus tipos de fichas configurados para calcular valores
+                  </CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 sm:gap-4">
+                    {chips.map((c) => (
+                      <div key={c.id} className="border rounded-lg p-3 text-center">
+                        <p className="text-xs sm:text-sm font-medium">{c.color}</p>
+                        <p className="text-sm sm:text-lg font-bold">R${c.value.toFixed(2).replace(".", ",")}</p>
+                      </div>
+                    ))}
+                  </div>
+                </CardContent>
+              </Card>
+            )}
           </TabsContent>
 
-          <TabsContent value="settlement" className="space-y-6">
-            {/* Balance Check */}
+          {/* --------------------------------------------------------------- */}
+          {/* Settlement                                                      */}
+          {/* --------------------------------------------------------------- */}
+          <TabsContent value="settlement" className="space-y-4 sm:space-y-6">
+            {/* Balance check */}
             <Card className={isBalanced ? "border-green-200 bg-green-50" : "border-yellow-200 bg-yellow-50"}>
               <CardHeader>
-                <CardTitle className={`flex items-center gap-2 ${isBalanced ? "text-green-800" : "text-yellow-800"}`}>
-                  {isBalanced ? <CheckCircle className="h-5 w-5" /> : <AlertCircle className="h-5 w-5" />}
+                <CardTitle
+                  className={`flex items-center gap-2 text-base sm:text-lg ${
+                    isBalanced ? "text-green-800" : "text-yellow-800"
+                  }`}
+                >
+                  {isBalanced ? (
+                    <CheckCircle className="size-4 sm:size-5" />
+                  ) : (
+                    <AlertCircle className="size-4 sm:size-5" />
+                  )}
                   Verificação de Saldo
                 </CardTitle>
               </CardHeader>
               <CardContent>
                 <div className="grid grid-cols-2 gap-4 text-sm">
                   <div>
-                    <div className="font-medium">Total Esperado:</div>
-                    <div>R${expectedBalance.toFixed(2).replace(".", ",")}</div>
-                    <div className="text-xs text-muted-foreground">Buy-ins + Pagamentos</div>
+                    <p className="font-medium">Total Esperado:</p>
+                    <p className="text-base sm:text-lg">R${expectedBalance.toFixed(2).replace(".", ",")}</p>
+                    <p className="text-xs text-muted-foreground">Buy-ins + Pagamentos</p>
                   </div>
                   <div>
-                    <div className="font-medium">Total Real:</div>
-                    <div>R${actualBalance.toFixed(2).replace(".", ",")}</div>
-                    <div className="text-xs text-muted-foreground">Cash-outs + Fichas Finais</div>
+                    <p className="font-medium">Total Real:</p>
+                    <p className="text-base sm:text-lg">R${actualBalance.toFixed(2).replace(".", ",")}</p>
+                    <p className="text-xs text-muted-foreground">Cash-outs + Fichas</p>
                   </div>
                 </div>
+
                 {!isBalanced && (
-                  <div className="mt-4 p-3 bg-yellow-100 rounded-lg">
-                    <p className="text-yellow-800 font-medium">
-                      Diferença: R${Math.abs(netDifference).toFixed(2).replace(".", ",")}
-                    </p>
-                    <p className="text-sm text-yellow-700 mt-1">
-                      {netDifference > 0
-                        ? "Mais dinheiro/fichas do que o esperado. Verifique se há buy-ins faltando."
-                        : "Menos dinheiro/fichas do que o esperado. Verifique se há cash-outs ou contagens de fichas faltando."}
-                    </p>
+                  <div className="mt-4 p-3 bg-yellow-100 rounded-lg text-xs sm:text-sm">
+                    Diferença de {netDifference > 0 ? "excesso" : "falta"}:&nbsp;
+                    <span className="font-medium">R${Math.abs(netDifference).toFixed(2).replace(".", ",")}</span>
                   </div>
                 )}
               </CardContent>
             </Card>
 
-            {/* Player Final Positions */}
+            {/* Player positions */}
             <Card>
               <CardHeader>
-                <CardTitle>Posições Finais dos Jogadores</CardTitle>
-                <CardDescription>
-                  Posição líquida incluindo valores finais de fichas (positivo = recebe dinheiro, negativo = paga
-                  dinheiro)
-                </CardDescription>
+                <CardTitle className="text-base sm:text-lg">Posições Finais dos Jogadores</CardTitle>
+                <CardDescription className="text-sm">Posição líquida incluindo fichas finais</CardDescription>
               </CardHeader>
               <CardContent>
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead>Jogador</TableHead>
-                      <TableHead className="text-right">Buy-ins</TableHead>
-                      <TableHead className="text-right">Cash-outs</TableHead>
-                      <TableHead className="text-right">Fichas Finais</TableHead>
-                      <TableHead className="text-right">Posição Líquida</TableHead>
-                      <TableHead className="text-center">Status</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {playerBalances.map((balance) => (
-                      <TableRow key={balance.playerId}>
-                        <TableCell className="font-medium">{balance.playerName}</TableCell>
-                        <TableCell className="text-right text-red-600">
-                          R${balance.buyIns.toFixed(2).replace(".", ",")}
-                        </TableCell>
-                        <TableCell className="text-right text-green-600">
-                          R${balance.cashOuts.toFixed(2).replace(".", ",")}
-                        </TableCell>
-                        <TableCell className="text-right text-blue-600">
-                          R${balance.finalChipValue.toFixed(2).replace(".", ",")}
-                        </TableCell>
-                        <TableCell
-                          className={`text-right font-bold ${
-                            balance.netPosition > 0
-                              ? "text-green-600"
-                              : balance.netPosition < 0
-                                ? "text-red-600"
-                                : "text-gray-600"
-                          }`}
-                        >
-                          {balance.netPosition >= 0 ? "+" : ""}R${balance.netPosition.toFixed(2).replace(".", ",")}
-                        </TableCell>
-                        <TableCell className="text-center">
-                          <Badge
-                            variant={
-                              balance.netPosition > 0
-                                ? "default"
-                                : balance.netPosition < 0
-                                  ? "destructive"
-                                  : "secondary"
-                            }
-                          >
-                            {balance.netPosition > 0 ? "Recebe" : balance.netPosition < 0 ? "Paga" : "Equilibrado"}
-                          </Badge>
-                        </TableCell>
+                {/* Mobile */}
+                <div className="sm:hidden space-y-3">
+                  {playerBalances.map((b) => (
+                    <PlayerPositionCard key={b.playerId} balance={b} />
+                  ))}
+                </div>
+
+                {/* Desktop */}
+                <div className="hidden sm:block overflow-x-auto">
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>Jogador</TableHead>
+                        <TableHead className="text-right">Buy-ins</TableHead>
+                        <TableHead className="text-right">Cash-outs</TableHead>
+                        <TableHead className="text-right">Fichas</TableHead>
+                        <TableHead className="text-right">Posição</TableHead>
+                        <TableHead className="text-center">Status</TableHead>
                       </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
+                    </TableHeader>
+                    <TableBody>
+                      {playerBalances.map((b) => (
+                        <TableRow key={b.playerId}>
+                          <TableCell className="font-medium">{b.playerName}</TableCell>
+                          <TableCell className="text-right text-red-600">
+                            R${b.buyIns.toFixed(2).replace(".", ",")}
+                          </TableCell>
+                          <TableCell className="text-right text-green-600">
+                            R${b.cashOuts.toFixed(2).replace(".", ",")}
+                          </TableCell>
+                          <TableCell className="text-right text-blue-600">
+                            R${b.finalChipValue.toFixed(2).replace(".", ",")}
+                          </TableCell>
+                          <TableCell
+                            className={`text-right font-bold ${
+                              b.netPosition > 0
+                                ? "text-green-600"
+                                : b.netPosition < 0
+                                  ? "text-red-600"
+                                  : "text-muted-foreground"
+                            }`}
+                          >
+                            {b.netPosition >= 0 ? "+" : ""}
+                            R${b.netPosition.toFixed(2).replace(".", ",")}
+                          </TableCell>
+                          <TableCell className="text-center">
+                            <Badge
+                              variant={b.netPosition > 0 ? "default" : b.netPosition < 0 ? "destructive" : "secondary"}
+                            >
+                              {b.netPosition > 0 ? "Recebe" : b.netPosition < 0 ? "Paga" : "Equilibrado"}
+                            </Badge>
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                </div>
               </CardContent>
             </Card>
 
-            {/* Settlement Recommendations */}
-            {optimalSettlements.length > 0 && (
+            {/* Settlement list */}
+            {optimalSettlements.length > 0 ? (
               <Card>
                 <CardHeader>
                   <div className="flex justify-between items-center">
                     <div>
-                      <CardTitle>Acerto de Contas Entre Jogadores</CardTitle>
-                      <CardDescription>Transações ótimas para acertar todos os jogadores</CardDescription>
+                      <CardTitle className="text-base sm:text-lg">Acerto de Contas Entre Jogadores</CardTitle>
+                      <CardDescription className="text-sm">Transações ótimas para equilibrar todos</CardDescription>
                     </div>
-                    <Button variant="outline" onClick={handleCopySettlement}>
-                      Copiar Acerto de Contas
+                    <Button variant="outline" onClick={copySettlement}>
+                      Copiar
                     </Button>
                   </div>
                 </CardHeader>
-                <CardContent>
-                  <div className="space-y-4">
-                    {optimalSettlements.map((settlement, index) => (
-                      <div key={index} className="flex items-center justify-between p-4 border rounded-lg bg-gray-50">
-                        <div className="flex items-center gap-4">
-                          <div className="text-center">
-                            <div className="font-medium">{settlement.fromName}</div>
-                            <Badge variant="destructive" className="text-xs">
-                              Paga
-                            </Badge>
-                          </div>
-                          <ArrowRight className="h-5 w-5 text-muted-foreground" />
-                          <div className="text-center">
-                            <div className="font-medium">{settlement.toName}</div>
-                            <Badge variant="default" className="text-xs">
-                              Recebe
-                            </Badge>
-                          </div>
-                        </div>
-                        <div className="text-right">
-                          <div className="text-2xl font-bold text-green-600">
-                            R${settlement.amount.toFixed(2).replace(".", ",")}
-                          </div>
-                        </div>
+                <CardContent className="space-y-4">
+                  {optimalSettlements.map((s, i) => (
+                    <div key={i} className="p-3 sm:p-4 border rounded-lg bg-muted/50 flex items-center justify-between">
+                      <div className="flex items-center gap-3">
+                        <SettlementParty name={s.fromName} type="from" />
+                        <ArrowRight className="size-4 text-muted-foreground" />
+                        <SettlementParty name={s.toName} type="to" />
                       </div>
-                    ))}
-                  </div>
+                      <p className="text-sm sm:text-lg font-bold text-green-600">
+                        R${s.amount.toFixed(2).replace(".", ",")}
+                      </p>
+                    </div>
+                  ))}
 
-                  <Separator className="my-4" />
+                  <Separator />
 
-                  <div className="text-center text-sm text-muted-foreground">
-                    <p>Total de acertos necessários: {optimalSettlements.length}</p>
-                    <p>
-                      Valor total a ser transferido: R$
-                      {optimalSettlements
-                        .reduce((sum, s) => sum + s.amount, 0)
-                        .toFixed(2)
-                        .replace(".", ",")}
-                    </p>
-                  </div>
+                  <p className="text-center text-xs sm:text-sm text-muted-foreground">
+                    {optimalSettlements.length} transaç
+                    {optimalSettlements.length === 1 ? "ão" : "ões"} &nbsp;•&nbsp; Valor total:&nbsp; R$
+                    {optimalSettlements
+                      .reduce((s, o) => s + o.amount, 0)
+                      .toFixed(2)
+                      .replace(".", ",")}
+                  </p>
                 </CardContent>
               </Card>
-            )}
-
-            {/* No settlements needed */}
-            {optimalSettlements.length === 0 && (
+            ) : (
               <Card>
-                <CardContent className="text-center py-8">
-                  <CheckCircle className="h-12 w-12 text-green-500 mx-auto mb-4" />
-                  <h3 className="text-lg font-semibold mb-2">Todos Equilibrados!</h3>
-                  <p className="text-muted-foreground">
-                    Nenhum acerto de contas é necessário. Todos os jogadores estão equilibrados após considerar os
-                    valores finais das fichas.
+                <CardContent className="py-8 text-center space-y-2">
+                  <CheckCircle className="size-8 sm:size-10 text-green-500 mx-auto" />
+                  <p className="text-sm sm:text-base font-medium">Todos Equilibrados!</p>
+                  <p className="text-xs sm:text-sm text-muted-foreground">
+                    Nenhum acerto necessário após considerar as fichas finais.
                   </p>
                 </CardContent>
               </Card>
@@ -608,15 +595,129 @@ export function SettleUp({ sessionId, onClose }: SettleUpProps) {
           </TabsContent>
         </Tabs>
 
-        <div className="flex justify-between pt-4">
-          <Button variant="outline" onClick={resetChipCounts} disabled={!chipCountsEntered}>
-            Redefinir Contagens de Fichas
+        {/* ----------------------------------------------------------------- */}
+        {/* Footer actions                                                    */}
+        {/* ----------------------------------------------------------------- */}
+        <div className="flex justify-between pt-4 gap-2">
+          <Button
+            variant="outline"
+            onClick={resetChipCounts}
+            disabled={!chipCountsEntered}
+            className="w-full sm:w-auto bg-transparent"
+          >
+            Redefinir Contagens
           </Button>
-          <Button variant="outline" onClick={onClose}>
+          <Button variant="outline" onClick={onClose} className="w-full sm:w-auto bg-transparent">
             Fechar
           </Button>
         </div>
       </DialogContent>
     </Dialog>
+  )
+}
+
+/* ------------------------------------------------------------------------- */
+/* Helper components                                                         */
+/* ------------------------------------------------------------------------- */
+
+function SummaryCard({
+  title,
+  icon,
+  value,
+  valueClass = "",
+  footer,
+}: {
+  title: string
+  icon: React.ReactNode
+  value: React.ReactNode
+  valueClass?: string
+  footer?: string
+}) {
+  return (
+    <Card className="min-h-[90px] sm:min-h-[110px] flex flex-col justify-between">
+      <CardHeader className="pb-2">
+        <CardTitle className="flex items-center gap-1 text-xs sm:text-sm font-medium">
+          {icon}
+          {title}
+        </CardTitle>
+      </CardHeader>
+      <CardContent>
+        <p className={`text-lg sm:text-2xl font-bold ${valueClass}`}>{value}</p>
+        {footer && <p className="text-xs text-muted-foreground">{footer}</p>}
+      </CardContent>
+    </Card>
+  )
+}
+
+function TransactionCard({ balance }: { balance: PlayerBalance }) {
+  return (
+    <div className="border rounded-lg p-3 text-xs space-y-1">
+      <p className="font-medium text-sm mb-1">{balance.playerName}</p>
+      <div className="grid grid-cols-2 gap-2">
+        <div>
+          Buy-ins:{" "}
+          <span className="text-red-600">
+            R$
+            {balance.buyIns.toFixed(2).replace(".", ",")}
+          </span>
+        </div>
+        <div>
+          Cash-outs:{" "}
+          <span className="text-green-600">
+            R$
+            {balance.cashOuts.toFixed(2).replace(".", ",")}
+          </span>
+        </div>
+        <div>
+          Pagamentos:{" "}
+          <span className="text-blue-600">
+            R$
+            {balance.payments.toFixed(2).replace(".", ",")}
+          </span>
+        </div>
+        <div>Transações: {balance.transactionCount}</div>
+      </div>
+    </div>
+  )
+}
+
+function PlayerPositionCard({ balance }: { balance: PlayerBalance }) {
+  return (
+    <div className="border rounded-lg p-3 space-y-2 text-xs">
+      <div className="flex items-center justify-between">
+        <p className="font-medium">{balance.playerName}</p>
+        <Badge
+          variant={balance.netPosition > 0 ? "default" : balance.netPosition < 0 ? "destructive" : "secondary"}
+          className="text-[10px]"
+        >
+          {balance.netPosition > 0 ? "Recebe" : balance.netPosition < 0 ? "Paga" : "Equilibrado"}
+        </Badge>
+      </div>
+
+      <div className="grid grid-cols-2 gap-1">
+        <div>Buy-ins: R${balance.buyIns.toFixed(2).replace(".", ",")}</div>
+        <div>Cash-outs: R${balance.cashOuts.toFixed(2).replace(".", ",")}</div>
+        <div>Fichas: R${balance.finalChipValue.toFixed(2).replace(".", ",")}</div>
+        <div
+          className={`font-bold ${
+            balance.netPosition > 0 ? "text-green-600" : balance.netPosition < 0 ? "text-red-600" : ""
+          }`}
+        >
+          {balance.netPosition >= 0 ? "+" : ""}
+          R${balance.netPosition.toFixed(2).replace(".", ",")}
+        </div>
+      </div>
+    </div>
+  )
+}
+
+function SettlementParty({ name, type }: { name: string; type: "from" | "to" }) {
+  return (
+    <div className="text-center">
+      <p className="text-xs sm:text-sm font-medium truncate max-w-[80px]">{name}</p>
+      <Badge variant={type === "from" ? "destructive" : "default"} className="text-[10px] sm:text-xs">
+        {type === "from" ? "Paga" : "Recebe"}
+      </Badge>
+    </div>
   )
 }
