@@ -1,8 +1,13 @@
 const { createClient } = require('@supabase/supabase-js')
 
-// Configuração do Supabase
-const supabaseUrl = 'https://hcomdspyqaqhaoeoclrm.supabase.co'
-const supabaseKey = 'REMOVED_SUPABASE_ANON_KEY'
+// Configuração do Supabase - usando variáveis de ambiente por segurança
+const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
+const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
+
+if (!supabaseUrl || !supabaseKey) {
+  console.error('❌ Variáveis de ambiente NEXT_PUBLIC_SUPABASE_URL e NEXT_PUBLIC_SUPABASE_ANON_KEY são obrigatórias')
+  process.exit(1)
+}
 
 const supabase = createClient(supabaseUrl, supabaseKey)
 
@@ -32,7 +37,7 @@ async function createTestUser() {
   try {
     const { data, error } = await supabase.auth.signUp({
       email: 'teste@poker.com',
-      password: 'Teste123!'
+      password: process.env.TEST_PASSWORD || 'INSIRA_SENHA_AQUI'
     })
     
     if (error) {
@@ -54,7 +59,7 @@ async function loginTestUser() {
   try {
     const { data, error } = await supabase.auth.signInWithPassword({
       email: 'teste@poker.com',
-      password: 'Teste123!'
+      password: process.env.TEST_PASSWORD || 'INSIRA_SENHA_AQUI'
     })
     
     if (error) {

@@ -3,12 +3,15 @@ import { NextResponse } from 'next/server'
 import type { NextRequest } from 'next/server'
 
 export async function middleware(request: NextRequest) {
+  const pathname = request.nextUrl.pathname
+  console.log('🔍 MIDDLEWARE: Processando rota:', pathname)
+  
   // Verificar se as variáveis de ambiente estão definidas
   const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
   const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
 
   if (!supabaseUrl || !supabaseAnonKey) {
-    console.error('Missing Supabase environment variables')
+    console.error('❌ MIDDLEWARE: Missing Supabase environment variables')
     return NextResponse.next()
   }
 
@@ -22,35 +25,70 @@ export async function middleware(request: NextRequest) {
     {
       cookies: {
         getAll() {
-          return request.cookies.getAll()
+          const cookies = request.cookies.getAll()
+          const authCookies = cookies.filter(cookie => 
+            cookie.name.includes('supabase') || 
+            cookie.name.includes('auth') ||
+            cookie.name.includes('sb-')
+          )
+          console.log('🍪 MIDDLEWARE: Cookies de auth encontrados:', authCookies.length)
+          authCookies.forEach(cookie => {
+            console.log(`   - ${cookie.name}: ${cookie.value.substring(0, 50)}${cookie.value.length > 50 ? '...' : ''}`)
+          })
+          return cookies
         },
         setAll(cookiesToSet) {
-          cookiesToSet.forEach(({ name, value, options }) => request.cookies.set(name, value))
+          console.log('📝 MIDDLEWARE: Definindo cookies:', cookiesToSet.length)
+          cookiesToSet.forEach(({ name, value }) => {
+            console.log(`   - Definindo: ${name}`)
+            request.cookies.set(name, value)
+          })
           supabaseResponse = NextResponse.next({
             request,
           })
-          cookiesToSet.forEach(({ name, value, options }) =>
+          cookiesToSet.forEach(({ name, value, options }) => {
             supabaseResponse.cookies.set(name, value, options)
-          )
+          })
         },
       },
     }
   )
 
   try {
-    const { data: { user } } = await supabase.auth.getUser()
+    // Obter a sessão atual
+    console.log('🔄 MIDDLEWARE: Verificando sessão...')
+    const { data: { session }, error } = await supabase.auth.getSession()
+    
+    if (error) {
+      console.error('❌ MIDDLEWARE: Erro ao verificar sessão:', error.message)
+    }
 
-    // Se não há usuário e está tentando acessar o dashboard, redireciona para login
-    if (!user && request.nextUrl.pathname.startsWith('/dashboard')) {
+    console.log('📊 MIDDLEWARE: Resultado da sessão:')
+    console.log('   - Sessão encontrada:', session ? 'SIM' : 'NÃO')
+    if (session) {
+      console.log('   - Usuário:', session.user.email)
+      console.log('   - Expires at:', new Date(session.expires_at! * 1000).toLocaleString('pt-BR'))
+      // Token log removido por segurança
+    }
+
+    const isAuthPage = pathname === '/login'
+    const isProtectedPage = pathname.startsWith('/dashboard')
+
+    // Se usuário está logado e tenta acessar /login, redirecionar para dashboard
+    if (session && isAuthPage) {
+      console.log('✅ MIDDLEWARE: Usuário logado tentando acessar login, redirecionando para dashboard')
+      return NextResponse.redirect(new URL('/dashboard', request.url))
+    }
+
+    // Se usuário não está logado e tenta acessar página protegida, redirecionar para login
+    if (!session && isProtectedPage) {
+      console.log('🚫 MIDDLEWARE: Sem sessão, redirecionando para /login')
       return NextResponse.redirect(new URL('/login', request.url))
     }
 
-    // Se há usuário e está na página de login, redireciona para dashboard
-    if (user && request.nextUrl.pathname === '/login') {
-      return NextResponse.redirect(new URL('/dashboard', request.url))
-    }
+    console.log('✅ MIDDLEWARE: Fluxo autorizado, continuando...')
   } catch (error) {
-    console.error('Middleware error:', error)
+    console.error('💥 MIDDLEWARE: Erro geral:', error)
   }
 
   return supabaseResponse
