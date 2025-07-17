@@ -1,30 +1,77 @@
-# Poker cash manager app
+# Poker Cash Management System
 
-*Automatically synced with your [v0.dev](https://v0.dev) deployments*
+Um sistema completo para gerenciamento de sessões de poker, jogadores, transações e acerto de contas.
 
-[![Deployed on Vercel](https://img.shields.io/badge/Deployed%20on-Vercel-black?style=for-the-badge&logo=vercel)](https://vercel.com/lucas-barretos-projects-ddc19cfd/v0-poker-cash-manager-app)
-[![Built with v0](https://img.shields.io/badge/Built%20with-v0.dev-black?style=for-the-badge)](https://v0.dev/chat/projects/JeKzMVI6YnZ)
+## Funcionalidades
 
-## Overview
+- ✅ **Gerenciamento de Sessões**: Crie e gerencie sessões de poker com múltiplas mesas
+- ✅ **Controle de Jogadores**: Cadastro e gerenciamento de jogadores
+- ✅ **Transações**: Controle de buy-ins, cash-outs e pagamentos
+- ✅ **Acerto de Contas**: Cálculo automático de débitos e créditos
+- ✅ **Gerenciamento de Fichas**: Controle de valores e cores das fichas
+- ✅ **Timer de Blinds**: Sistema de timer para torneios
+- ✅ **Interface Responsiva**: Otimizada para desktop e mobile
+- ✅ **Autenticação**: Sistema de login seguro com Supabase
 
-This repository will stay in sync with your deployed chats on [v0.dev](https://v0.dev).
-Any changes you make to your deployed app will be automatically pushed to this repository from [v0.dev](https://v0.dev).
+## Tecnologias Utilizadas
 
-## Deployment
+- **Frontend**: Next.js 14, React, TypeScript
+- **Styling**: Tailwind CSS, Shadcn/ui
+- **Backend**: Supabase (PostgreSQL, Auth, Real-time)
+- **State Management**: Zustand
+- **Deployment**: Vercel
 
-Your project is live at:
+## Configuração
 
-**[https://vercel.com/lucas-barretos-projects-ddc19cfd/v0-poker-cash-manager-app](https://vercel.com/lucas-barretos-projects-ddc19cfd/v0-poker-cash-manager-app)**
+Veja o arquivo [SETUP.md](./SETUP.md) para instruções detalhadas de configuração.
 
-## Build your app
+## Instalação Rápida
 
-Continue building your app on:
+```bash
+# Clone o repositório
+git clone <repository-url>
+cd poker-cash-mgmt
 
-**[https://v0.dev/chat/projects/JeKzMVI6YnZ](https://v0.dev/chat/projects/JeKzMVI6YnZ)**
+# Instale as dependências
+npm install
 
-## How It Works
+# Configure as variáveis de ambiente
+cp .env.example .env.local
+# Edite .env.local com suas credenciais do Supabase
 
-1. Create and modify your project using [v0.dev](https://v0.dev)
-2. Deploy your chats from the v0 interface
-3. Changes are automatically pushed to this repository
-4. Vercel deploys the latest version from this repository
+# Execute o projeto
+npm run dev
+```
+
+## Estrutura do Projeto
+
+```
+├── app/                    # Páginas da aplicação (App Router)
+├── components/            # Componentes React
+│   ├── ui/               # Componentes base (Shadcn/ui)
+│   └── auth/             # Componentes de autenticação
+├── lib/                  # Utilitários e configurações
+├── hooks/                # Custom hooks
+├── scripts/              # Scripts de teste e utilitários
+├── public/               # Arquivos estáticos
+└── styles/               # Estilos globais
+```
+
+## Scripts Disponíveis
+
+- `npm run dev` - Executar em modo de desenvolvimento
+- `npm run build` - Build para produção
+- `npm run start` - Executar build de produção
+- `npm run lint` - Executar linter
+
+## Contribuição
+
+1. Faça um fork do projeto
+2. Crie uma branch para sua feature (`git checkout -b feature/nova-feature`)
+3. Commit suas mudanças (`git commit -m 'Adiciona nova feature'`)
+4. Push para a branch (`git push origin feature/nova-feature`)
+5. Abra um Pull Request
+
+## Licença
+
+Este projeto está sob a licença MIT. Veja o arquivo [LICENSE](LICENSE) para mais detalhes.

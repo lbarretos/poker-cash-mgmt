@@ -69,11 +69,11 @@ export function SettleUp({ sessionId, onClose }: SettleUpProps) {
   /* Derived data */
   /* --------------------------------------------------------------------- */
   const session = sessions.find((s) => s.id === sessionId)
-  const sessionTransactions = transactions.filter((t) => t.sessionId === sessionId)
+  const sessionTransactions = transactions.filter((t) => t.session_id === sessionId)
 
   /* players that played */
   const sessionPlayers = useMemo(() => {
-    const ids = new Set(sessionTransactions.map((t) => t.playerId))
+    const ids = new Set(sessionTransactions.map((t) => t.player_id))
     return Array.from(ids).map((id) => ({
       id,
       name: players.find((p) => p.id === id)?.name ?? "Jogador Desconhecido",
@@ -95,10 +95,10 @@ export function SettleUp({ sessionId, onClose }: SettleUpProps) {
 
     /* seed balances */
     sessionTransactions.forEach((t) => {
-      if (!map.has(t.playerId)) {
-        map.set(t.playerId, {
-          playerId: t.playerId,
-          playerName: players.find((p) => p.id === t.playerId)?.name ?? "Jogador Desconhecido",
+      if (!map.has(t.player_id)) {
+        map.set(t.player_id, {
+          playerId: t.player_id,
+          playerName: players.find((p) => p.id === t.player_id)?.name ?? "Jogador Desconhecido",
           buyIns: 0,
           cashOuts: 0,
           payments: 0,
@@ -111,7 +111,7 @@ export function SettleUp({ sessionId, onClose }: SettleUpProps) {
 
     /* accumulate transactions */
     sessionTransactions.forEach((t) => {
-      const bal = map.get(t.playerId)!
+      const bal = map.get(t.player_id)!
       bal.transactionCount += 1
       if (t.type === "buy-in") bal.buyIns += t.amount
       if (t.type === "cash-out") bal.cashOuts += t.amount

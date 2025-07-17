@@ -19,7 +19,8 @@ import {
   DialogTrigger,
 } from "@/components/ui/dialog"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { Plus, Edit, Trash2, ArrowUpCircle, ArrowDownCircle, CreditCard } from "lucide-react"
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
+import { Plus, Edit, Trash2, ArrowUpCircle, ArrowDownCircle, CreditCard, MoreVertical } from "lucide-react"
 import { usePokerStore } from "@/lib/store"
 import { useToast } from "@/hooks/use-toast"
 
@@ -41,8 +42,8 @@ export function TransactionManager() {
     e.preventDefault()
 
     const transactionData = {
-      sessionId: formData.sessionId,
-      playerId: formData.playerId,
+      session_id: formData.sessionId,
+      player_id: formData.playerId,
       type: formData.type,
       amount: Number.parseFloat(formData.amount),
       tableNumber: formData.tableNumber ? Number.parseInt(formData.tableNumber) : undefined,
@@ -78,12 +79,12 @@ export function TransactionManager() {
   const handleEdit = (transaction: any) => {
     setEditingTransaction(transaction.id)
     setFormData({
-      sessionId: transaction.sessionId,
-      playerId: transaction.playerId,
+      sessionId: transaction.session_id,
+      playerId: transaction.player_id,
       type: transaction.type,
       amount: transaction.amount.toString(),
       tableNumber: transaction.tableNumber?.toString() || "",
-      notes: transaction.notes || "",
+      notes: transaction.notes || transaction.description || "",
     })
     setIsDialogOpen(true)
   }
@@ -136,7 +137,7 @@ export function TransactionManager() {
   }
 
   const sortedTransactions = [...transactions].sort(
-    (a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime(),
+    (a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime(),
   )
 
   return (
@@ -276,8 +277,8 @@ export function TransactionManager() {
 
       <div className="grid gap-4">
         {sortedTransactions.map((transaction) => {
-          const session = sessions.find((s) => s.id === transaction.sessionId)
-          const player = players.find((p) => p.id === transaction.playerId)
+          const session = sessions.find((s) => s.id === transaction.session_id)
+          const player = players.find((p) => p.id === transaction.player_id)
 
           return (
             <Card key={transaction.id}>
@@ -294,7 +295,7 @@ export function TransactionManager() {
                       </CardTitle>
                       <CardDescription>
                         {session?.name || "Sessão Desconhecida"} •{" "}
-                        {new Date(transaction.timestamp).toLocaleString("pt-BR")}
+                        {new Date(transaction.created_at).toLocaleString("pt-BR")}
                       </CardDescription>
                     </div>
                   </div>
@@ -310,13 +311,35 @@ export function TransactionManager() {
                     >
                       {transaction.type === "buy-in" ? "-" : "+"}R${transaction.amount.toFixed(2).replace(".", ",")}
                     </div>
-                    <div className="flex gap-2">
+                    {/* Desktop Actions */}
+                    <div className="hidden sm:flex gap-2">
                       <Button variant="outline" size="sm" onClick={() => handleEdit(transaction)}>
                         <Edit className="h-4 w-4" />
                       </Button>
                       <Button variant="outline" size="sm" onClick={() => handleDelete(transaction.id)}>
                         <Trash2 className="h-4 w-4" />
                       </Button>
+                    </div>
+
+                    {/* Mobile Actions */}
+                    <div className="sm:hidden">
+                      <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                          <Button variant="outline" size="sm">
+                            <MoreVertical className="h-4 w-4" />
+                          </Button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="end" className="w-40">
+                          <DropdownMenuItem onClick={() => handleEdit(transaction)}>
+                            <Edit className="h-4 w-4 mr-2" />
+                            Editar
+                          </DropdownMenuItem>
+                          <DropdownMenuItem onClick={() => handleDelete(transaction.id)} className="text-red-600">
+                            <Trash2 className="h-4 w-4 mr-2" />
+                            Excluir
+                          </DropdownMenuItem>
+                        </DropdownMenuContent>
+                      </DropdownMenu>
                     </div>
                   </div>
                 </div>

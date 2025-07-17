@@ -27,6 +27,7 @@ export function PlayerManager() {
   const { toast } = useToast()
   const [isDialogOpen, setIsDialogOpen] = useState(false)
   const [editingPlayer, setEditingPlayer] = useState<string | null>(null)
+  const [loading, setLoading] = useState(false)
   const [formData, setFormData] = useState({
     name: "",
     email: "",
@@ -34,26 +35,38 @@ export function PlayerManager() {
     notes: "",
   })
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
+    setLoading(true)
 
-    if (editingPlayer) {
-      updatePlayer(editingPlayer, formData)
+    try {
+      if (editingPlayer) {
+        await updatePlayer(editingPlayer, formData)
+        toast({
+          title: "Jogador atualizado",
+          description: "As informações do jogador foram atualizadas com sucesso.",
+        })
+      } else {
+        await addPlayer(formData)
+        toast({
+          title: "Jogador adicionado",
+          description: "Novo jogador adicionado com sucesso.",
+        })
+      }
+
+      setIsDialogOpen(false)
+      setEditingPlayer(null)
+      setFormData({ name: "", email: "", phone: "", notes: "" })
+    } catch (error: any) {
+      console.error('❌ Erro no handleSubmit:', error)
       toast({
-        title: "Jogador atualizado",
-        description: "As informações do jogador foram atualizadas com sucesso.",
+        title: "Erro ao salvar jogador",
+        description: error.message || "Erro desconhecido. Verifique o console para mais detalhes.",
+        variant: "destructive",
       })
-    } else {
-      addPlayer(formData)
-      toast({
-        title: "Jogador adicionado",
-        description: "Novo jogador adicionado com sucesso.",
-      })
+    } finally {
+      setLoading(false)
     }
-
-    setIsDialogOpen(false)
-    setEditingPlayer(null)
-    setFormData({ name: "", email: "", phone: "", notes: "" })
   }
 
   const handleEdit = (player: any) => {
@@ -173,8 +186,8 @@ export function PlayerManager() {
                 </div>
               </div>
               <DialogFooter className="flex-col sm:flex-row gap-2">
-                <Button type="submit" className="w-full sm:w-auto">
-                  {editingPlayer ? "Atualizar Jogador" : "Adicionar Jogador"}
+                <Button type="submit" className="w-full sm:w-auto" disabled={loading}>
+                  {loading ? "Salvando..." : editingPlayer ? "Atualizar Jogador" : "Adicionar Jogador"}
                 </Button>
               </DialogFooter>
             </form>
