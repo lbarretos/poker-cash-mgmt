@@ -4,16 +4,18 @@ import { useState, useEffect } from "react"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import { Users, DollarSign, TrendingUp, Settings, LogOut } from "lucide-react"
+import { Users, DollarSign, TrendingUp, Settings, LogOut, BarChart3, Play, CreditCard, Coins, User } from "lucide-react"
 import { usePokerStore } from "@/lib/store"
 import { SessionManager } from "@/components/session-manager"
 import { PlayerManager } from "@/components/player-manager"
 import { ChipManager } from "@/components/chip-manager"
 import { TransactionManager } from "@/components/transaction-manager"
+import { UserProfileManager } from "@/components/user-profile-manager"
 import { PokerTimer } from "@/components/poker-timer"
 import { Button } from "@/components/ui/button"
 import { supabase } from "@/lib/supabase"
 import { AuthGuard } from "@/components/auth/auth-guard"
+import Link from "next/link"
 
 export default function Dashboard() {
   const { sessions, players, transactions, chips, loadData } = usePokerStore()
@@ -45,33 +47,56 @@ export default function Dashboard() {
                 Gerencie suas sessões de poker, jogadores e fluxo de caixa de forma eficiente
               </p>
             </div>
-            <Button variant="outline" onClick={handleLogout} className="flex items-center gap-2">
-              <LogOut className="h-4 w-4" />
-              Sair
-            </Button>
+            <div className="flex gap-2">
+              <Link href="/debug-data">
+                <Button variant="outline" size="sm" className="text-xs">
+                  Debug
+                </Button>
+              </Link>
+              <Button variant="outline" onClick={handleLogout} className="flex items-center gap-2">
+                <LogOut className="h-4 w-4" />
+                Sair
+              </Button>
+            </div>
           </div>
 
           <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-4 sm:space-y-6">
-            <TabsList className="grid w-full grid-cols-5 h-auto p-1">
+            <TabsList className="grid w-full grid-cols-6 h-auto p-1">
               <TabsTrigger value="dashboard" className="text-xs sm:text-sm px-1 sm:px-3 py-2">
                 <span className="hidden sm:inline">Painel</span>
-                <span className="sm:hidden"></span>
+                <span className="sm:hidden flex items-center justify-center">
+                  <BarChart3 className="h-4 w-4" />
+                </span>
               </TabsTrigger>
               <TabsTrigger value="sessions" className="text-xs sm:text-sm px-1 sm:px-3 py-2">
                 <span className="hidden sm:inline">Sessões</span>
-                <span className="sm:hidden"></span>
+                <span className="sm:hidden flex items-center justify-center">
+                  <Play className="h-4 w-4" />
+                </span>
               </TabsTrigger>
               <TabsTrigger value="players" className="text-xs sm:text-sm px-1 sm:px-3 py-2">
                 <span className="hidden sm:inline">Jogadores</span>
-                <span className="sm:hidden"></span>
+                <span className="sm:hidden flex items-center justify-center">
+                  <Users className="h-4 w-4" />
+                </span>
               </TabsTrigger>
               <TabsTrigger value="transactions" className="text-xs sm:text-sm px-1 sm:px-3 py-2">
                 <span className="hidden sm:inline">Transações</span>
-                <span className="sm:hidden"></span>
+                <span className="sm:hidden flex items-center justify-center">
+                  <CreditCard className="h-4 w-4" />
+                </span>
               </TabsTrigger>
               <TabsTrigger value="chips" className="text-xs sm:text-sm px-1 sm:px-3 py-2">
                 <span className="hidden sm:inline">Fichas</span>
-                <span className="sm:hidden"></span>
+                <span className="sm:hidden flex items-center justify-center">
+                  <Coins className="h-4 w-4" />
+                </span>
+              </TabsTrigger>
+              <TabsTrigger value="profile" className="text-xs sm:text-sm px-1 sm:px-3 py-2">
+                <span className="hidden sm:inline">Perfil</span>
+                <span className="sm:hidden flex items-center justify-center">
+                  <User className="h-4 w-4" />
+                </span>
               </TabsTrigger>
             </TabsList>
 
@@ -214,6 +239,10 @@ export default function Dashboard() {
 
             <TabsContent value="chips">
               <ChipManager />
+            </TabsContent>
+
+            <TabsContent value="profile">
+              <UserProfileManager />
             </TabsContent>
           </Tabs>
 

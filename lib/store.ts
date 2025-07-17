@@ -260,33 +260,53 @@ export const usePokerStore = create<PokerStore>()((set, get) => ({
 
   addPlayer: async (player) => {
     try {
+      console.log('🔍 Iniciando criação de jogador...', player)
+      
       const { data: { user } } = await supabase.auth.getUser()
-      if (!user) return
+      if (!user) {
+        console.error('❌ Usuário não encontrado')
+        throw new Error('Usuário não encontrado')
+      }
+
+      console.log('✅ Usuário encontrado:', user.id)
 
       const newPlayer = {
         name: player.name,
-        email: player.email,
-        phone: player.phone,
+        email: player.email || null,
+        phone: player.phone || null,
+        notes: player.notes || null,
         user_id: user.id
       }
 
-      console.log('➕ Criando jogador:', newPlayer)
+      console.log('➕ Dados do jogador para inserção:', newPlayer)
 
       const { data, error } = await supabase
         .from('players')
         .insert([newPlayer])
         .select()
 
-      if (!error && data) {
-        console.log('✅ Jogador criado no banco:', data[0])
+      if (error) {
+        console.error('❌ Erro detalhado ao criar jogador:', {
+          message: error.message,
+          details: error.details,
+          hint: error.hint,
+          code: error.code
+        })
+        throw new Error(`Erro ao criar jogador: ${error.message}`)
+      }
+
+      if (data && data.length > 0) {
+        console.log('✅ Jogador criado com sucesso no banco:', data[0])
         set((state) => ({
           players: [data[0], ...state.players]
         }))
       } else {
-        console.error('❌ Erro ao criar jogador:', error)
+        console.error('❌ Dados não retornados após inserção')
+        throw new Error('Dados não retornados após inserção')
       }
     } catch (error) {
-      console.error('💥 Erro ao adicionar jogador:', error)
+      console.error('💥 Erro geral ao adicionar jogador:', error)
+      throw error
     }
   },
 

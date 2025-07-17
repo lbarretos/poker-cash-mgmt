@@ -19,7 +19,7 @@ import {
   DialogTrigger,
 } from "@/components/ui/dialog"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { Plus, Edit, Trash2, Play, Square, Calculator, MoreVertical } from "lucide-react"
+import { Plus, Edit, Trash2, Play, Square, Calculator, MoreVertical, Calendar, Clock, Table, FileText, Users } from "lucide-react"
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
 import { usePokerStore } from "@/lib/store"
 import { useToast } from "@/hooks/use-toast"
@@ -179,102 +179,179 @@ export function SessionManager() {
 
       <div className="grid gap-4">
         {sessions.map((session) => (
-          <Card key={session.id}>
+          <Card key={session.id} className="overflow-hidden hover:shadow-md transition-shadow">
             <CardHeader className="pb-3">
-              <div className="flex flex-col sm:flex-row sm:justify-between sm:items-start gap-3">
-                <div className="min-w-0 flex-1">
-                  <CardTitle className="flex items-center gap-2 text-base sm:text-lg">
-                    <span className="truncate">{session.name}</span>
-                    <Badge variant={session.status === "active" ? "default" : "secondary"} className="text-xs shrink-0">
-                      {session.status === "active" ? "Ativa" : "Concluída"}
-                    </Badge>
-                  </CardTitle>
-                  <CardDescription className="text-xs sm:text-sm">
-                    <div>Criada em: {new Date(session.created_at).toLocaleString("pt-BR")}</div>
-                                          {session.end_time && (
-                        <div className="mt-1">Concluída em: {new Date(session.end_time).toLocaleString("pt-BR")}</div>
+              <div className="flex flex-col gap-4">
+                {/* Header com título e status */}
+                <div className="flex items-start justify-between gap-3">
+                  <div className="min-w-0 flex-1">
+                    <CardTitle className="flex items-center gap-2 text-lg sm:text-xl mb-2">
+                      <span className="truncate">{session.name}</span>
+                      <Badge
+                        variant={session.status === "active" ? "default" : "secondary"}
+                        className="text-xs shrink-0 px-2 py-1"
+                      >
+                        {session.status === "active" ? "Ativa" : "Concluída"}
+                      </Badge>
+                    </CardTitle>
+
+                    {/* Informações principais com ícones */}
+                    <div className="flex flex-col gap-2 text-sm text-muted-foreground">
+                      <div className="flex items-center gap-2">
+                        <Calendar className="h-4 w-4" />
+                        <span>Criada em: {new Date(session.created_at).toLocaleDateString("pt-BR")}</span>
+                      </div>
+                      {session.end_time && (
+                        <div className="flex items-center gap-2">
+                          <Clock className="h-4 w-4" />
+                          <span>Concluída em: {new Date(session.end_time).toLocaleDateString("pt-BR")}</span>
+                        </div>
                       )}
-                  </CardDescription>
+                    </div>
+                  </div>
+
+                  {/* Desktop Actions */}
+                  <div className="hidden sm:flex gap-2">
+                    <Button variant="outline" size="sm" onClick={() => toggleSessionStatus(session)}>
+                      {session.status === "active" ? (
+                        <>
+                          <Square className="h-4 w-4 mr-1" />
+                          Concluir
+                        </>
+                      ) : (
+                        <>
+                          <Play className="h-4 w-4 mr-1" />
+                          Reativar
+                        </>
+                      )}
+                    </Button>
+                    <Button variant="outline" size="sm" onClick={() => setSettleUpSession(session.id)}>
+                      <Calculator className="h-4 w-4 mr-1" />
+                      Acertar Contas
+                    </Button>
+                    <Button variant="outline" size="sm" onClick={() => handleEdit(session)}>
+                      <Edit className="h-4 w-4" />
+                    </Button>
+                    <Button variant="outline" size="sm" onClick={() => handleDelete(session.id)}>
+                      <Trash2 className="h-4 w-4" />
+                    </Button>
+                  </div>
+
+                  {/* Mobile Actions */}
+                  <div className="sm:hidden">
+                    <DropdownMenu>
+                      <DropdownMenuTrigger asChild>
+                        <Button variant="outline" size="sm" className="h-8 w-8 p-0">
+                          <MoreVertical className="h-4 w-4" />
+                        </Button>
+                      </DropdownMenuTrigger>
+                      <DropdownMenuContent align="end" className="w-48">
+                        <DropdownMenuItem onClick={() => toggleSessionStatus(session)}>
+                          {session.status === "active" ? (
+                            <>
+                              <Square className="h-4 w-4 mr-2" />
+                              Concluir Sessão
+                            </>
+                          ) : (
+                            <>
+                              <Play className="h-4 w-4 mr-2" />
+                              Reativar Sessão
+                            </>
+                          )}
+                        </DropdownMenuItem>
+                        <DropdownMenuItem onClick={() => setSettleUpSession(session.id)}>
+                          <Calculator className="h-4 w-4 mr-2" />
+                          Acertar Contas
+                        </DropdownMenuItem>
+                        <DropdownMenuItem onClick={() => handleEdit(session)}>
+                          <Edit className="h-4 w-4 mr-2" />
+                          Editar
+                        </DropdownMenuItem>
+                        <DropdownMenuItem onClick={() => handleDelete(session.id)} className="text-red-600">
+                          <Trash2 className="h-4 w-4 mr-2" />
+                          Excluir
+                        </DropdownMenuItem>
+                      </DropdownMenuContent>
+                    </DropdownMenu>
+                  </div>
                 </div>
 
-                {/* Desktop Actions */}
-                <div className="hidden sm:flex gap-2">
-                  <Button variant="outline" size="sm" onClick={() => toggleSessionStatus(session)}>
+                {/* Mobile Actions Bar */}
+                <div className="sm:hidden flex gap-2">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => toggleSessionStatus(session)}
+                    className="flex-1 h-10"
+                  >
                     {session.status === "active" ? (
                       <>
-                        <Square className="h-4 w-4 mr-1" />
+                        <Square className="h-4 w-4 mr-2" />
                         Concluir
                       </>
                     ) : (
                       <>
-                        <Play className="h-4 w-4 mr-1" />
+                        <Play className="h-4 w-4 mr-2" />
                         Reativar
                       </>
                     )}
                   </Button>
-                  <Button variant="outline" size="sm" onClick={() => setSettleUpSession(session.id)}>
-                    <Calculator className="h-4 w-4 mr-1" />
-                    Acertar Contas
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setSettleUpSession(session.id)}
+                    className="flex-1 h-10"
+                  >
+                    <Calculator className="h-4 w-4 mr-2" />
+                    Acertar
                   </Button>
-                  <Button variant="outline" size="sm" onClick={() => handleEdit(session)}>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => handleEdit(session)}
+                    className="h-10 w-10 p-0"
+                  >
                     <Edit className="h-4 w-4" />
                   </Button>
-                  <Button variant="outline" size="sm" onClick={() => handleDelete(session.id)}>
-                    <Trash2 className="h-4 w-4" />
-                  </Button>
-                </div>
-
-                {/* Mobile Actions */}
-                <div className="sm:hidden">
-                  <DropdownMenu>
-                    <DropdownMenuTrigger asChild>
-                      <Button variant="outline" size="sm">
-                        <MoreVertical className="h-4 w-4" />
-                      </Button>
-                    </DropdownMenuTrigger>
-                    <DropdownMenuContent align="end" className="w-48">
-                      <DropdownMenuItem onClick={() => toggleSessionStatus(session)}>
-                        {session.status === "active" ? (
-                          <>
-                            <Square className="h-4 w-4 mr-2" />
-                            Concluir Sessão
-                          </>
-                        ) : (
-                          <>
-                            <Play className="h-4 w-4 mr-2" />
-                            Reativar Sessão
-                          </>
-                        )}
-                      </DropdownMenuItem>
-                      <DropdownMenuItem onClick={() => setSettleUpSession(session.id)}>
-                        <Calculator className="h-4 w-4 mr-2" />
-                        Acertar Contas
-                      </DropdownMenuItem>
-                      <DropdownMenuItem onClick={() => handleEdit(session)}>
-                        <Edit className="h-4 w-4 mr-2" />
-                        Editar
-                      </DropdownMenuItem>
-                      <DropdownMenuItem onClick={() => handleDelete(session.id)} className="text-red-600">
-                        <Trash2 className="h-4 w-4 mr-2" />
-                        Excluir
-                      </DropdownMenuItem>
-                    </DropdownMenuContent>
-                  </DropdownMenu>
                 </div>
               </div>
             </CardHeader>
+
             <CardContent className="pt-0">
-              <div className="grid grid-cols-2 gap-4 text-sm">
-                <div>
-                  <span className="font-medium">Mesas:</span> {session.tableCount}
+              <div className="space-y-4">
+                {/* Informações detalhadas */}
+                <div className="grid grid-cols-2 gap-4 text-sm">
+                  <div className="flex items-center gap-2 bg-muted/30 rounded-lg p-3">
+                    <Table className="h-4 w-4 text-muted-foreground" />
+                    <div>
+                      <div className="font-medium">{session.tableCount || 1}</div>
+                      <div className="text-xs text-muted-foreground">
+                        Mesa{(session.tableCount ||1) > 1 ? "s" : ""}
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="flex items-center gap-2 bg-muted/30 rounded-lg p-3">
+                    <Users className="h-4 w-4 text-muted-foreground" />
+                    <div>
+                      <div className="font-medium">
+                        {session.status === "active" ? "Ativa" : "Concluída"}
+                      </div>
+                      <div className="text-xs text-muted-foreground">Status</div>
+                    </div>
+                  </div>
                 </div>
-                <div>
-                  <span className="font-medium">Status:</span> {session.status === "active" ? "Ativa" : "Concluída"}
-                </div>
+
+                {/* Notas */}
                 {session.notes && (
-                  <div className="col-span-2">
-                    <span className="font-medium">Notas:</span>
-                    <p className="mt-1 text-muted-foreground break-words">{session.notes}</p>
+                  <div className="p-3 bg-muted/30 rounded-lg">
+                    <div className="flex items-center gap-2 mb-2">
+                      <FileText className="h-4 w-4 text-muted-foreground" />
+                      <span className="font-medium text-sm">Notas</span>
+                    </div>
+                    <p className="text-sm text-muted-foreground break-words leading-relaxed">
+                      {session.notes}
+                    </p>
                   </div>
                 )}
               </div>
@@ -283,10 +360,16 @@ export function SessionManager() {
         ))}
         {sessions.length === 0 && (
           <Card>
-            <CardContent className="text-center py-8">
-              <p className="text-muted-foreground text-sm">
-                Nenhuma sessão criada ainda. Crie sua primeira sessão para começar!
-              </p>
+            <CardContent className="text-center py-12">
+              <div className="space-y-3 mx-auto w-12 h-12 rounded-full flex items-center justify-center">
+                <Table className="h-6 w-6 text-muted-foreground" />
+              </div>
+              <div>
+                <p className="font-medium text-base">Nenhuma sessão criada</p>
+                <p className="text-muted-foreground text-sm mt-1">
+                  Crie sua primeira sessão para começar a gerenciar suas partidas de poker!
+                </p>
+              </div>
             </CardContent>
           </Card>
         )}
