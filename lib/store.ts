@@ -27,11 +27,12 @@ export interface Transaction {
   id: string
   session_id: string
   player_id: string
-  type: "buy-in" | "cash-out" | "payment"
+  type: "buy-in" | "cash-out" | "payment" | "consumption"
   amount: number
   created_at: string
   description?: string
   notes?: string
+  participants?: string[] // IDs dos participantes do consumo
   tableNumber?: number // UI only field
   user_id?: string
 }
@@ -153,7 +154,12 @@ export const usePokerStore = create<PokerStore>()((set, get) => ({
       set({
         sessions: sessions || [],
         players: players || [],
-        transactions: transactions || [],
+        transactions: (transactions || []).map((t: any) => ({
+          ...t,
+          participants: t.participants && typeof t.participants === 'string'
+            ? JSON.parse(t.participants)
+            : t.participants
+        })),
         chips: chips?.length ? chips : get().chips
       })
       
@@ -370,13 +376,16 @@ export const usePokerStore = create<PokerStore>()((set, get) => ({
       const { data: { user } } = await supabase.auth.getUser()
       if (!user) return
 
-      const newTransaction = {
+      const newTransaction: any = {
         session_id: transaction.session_id,
         player_id: transaction.player_id,
         type: transaction.type,
         amount: transaction.amount,
         description: transaction.notes || transaction.description,
         user_id: user.id
+      }
+      if (transaction.type === 'consumption' && transaction.participants) {
+        newTransaction.participants = transaction.participants
       }
 
       console.log('➕ Criando transação:', newTransaction)
@@ -387,7 +396,10 @@ export const usePokerStore = create<PokerStore>()((set, get) => ({
         .select()
 
       if (!error && data) {
-        console.log('✅ Transação criada no banco:', data[0])
+        // Converter participants de json para array se vier do banco
+        if (data[0].participants && typeof data[0].participants === 'string') {
+          data[0].participants = JSON.parse(data[0].participants)
+        }
         set((state) => ({
           transactions: [data[0], ...state.transactions]
         }))
@@ -405,12 +417,15 @@ export const usePokerStore = create<PokerStore>()((set, get) => ({
       if (!user) return
 
       // Mapear campos da UI para o DB
-      const dbUpdates = { ...updates }
+      const dbUpdates: any = { ...updates }
       if (dbUpdates.notes) {
         dbUpdates.description = dbUpdates.notes
         delete dbUpdates.notes
       }
       delete dbUpdates.tableNumber // Campo só da UI
+      if (dbUpdates.type === 'consumption' && dbUpdates.participants) {
+        dbUpdates.participants = dbUpdates.participants
+      }
 
       console.log('✏️ Atualizando transação:', id, dbUpdates)
 
@@ -421,7 +436,6 @@ export const usePokerStore = create<PokerStore>()((set, get) => ({
         .eq('user_id', user.id)
 
       if (!error) {
-        console.log('✅ Transação atualizada no banco')
         set((state) => ({
           transactions: state.transactions.map((transaction) =>
             transaction.id === id ? { ...transaction, ...updates } : transaction,

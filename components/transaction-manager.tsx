@@ -24,8 +24,9 @@ import { Plus, Edit, Trash2, ArrowUpCircle, ArrowDownCircle, CreditCard, MoreVer
 import { usePokerStore } from "@/lib/store"
 import { useToast } from "@/hooks/use-toast"
 
-export function TransactionManager() {
-  const { transactions, sessions, players, addTransaction, updateTransaction, deleteTransaction } = usePokerStore()
+export function TransactionManager({ transactions: propTransactions }: { transactions?: any[] } = {}) {
+  const { transactions: storeTransactions, sessions, players, addTransaction, updateTransaction, deleteTransaction } = usePokerStore()
+  const transactions = propTransactions || storeTransactions
   const { toast } = useToast()
   const [isDialogOpen, setIsDialogOpen] = useState(false)
   const [editingTransaction, setEditingTransaction] = useState<string | null>(null)
@@ -267,8 +268,8 @@ export function TransactionManager() {
                   />
                 </div>
               </div>
-              <DialogFooter>
-                <Button type="submit">{editingTransaction ? "Atualizar Transação" : "Adicionar Transação"}</Button>
+              <DialogFooter className="flex flex-col sm:flex-row gap-2">
+                <Button type="submit" className="w-full sm:w-auto">{editingTransaction ? "Atualizar Transação" : "Adicionar Transação"}</Button>
               </DialogFooter>
             </form>
           </DialogContent>
@@ -287,21 +288,20 @@ export function TransactionManager() {
                   <div className="flex items-center gap-3">
                     {getTransactionIcon(transaction.type)}
                     <div>
-                      <CardTitle className="flex items-center gap-2">
-                        {player?.name || "Jogador Desconhecido"}
+                      <CardTitle className="flex items-center gap-2 min-w-0">
+                        <span className="truncate max-w-[120px] sm:max-w-[200px]">{player?.name || "Jogador Desconhecido"}</span>
                         <Badge variant={getTransactionColor(transaction.type) as any}>
                           {getTransactionTypeLabel(transaction.type)}
                         </Badge>
                       </CardTitle>
-                      <CardDescription>
-                        {session?.name || "Sessão Desconhecida"} •{" "}
-                        {new Date(transaction.created_at).toLocaleString("pt-BR")}
+                      <CardDescription className="truncate max-w-[160px] sm:max-w-[300px]">
+                        <span className="truncate">{session?.name || "Sessão Desconhecida"}</span> • {new Date(transaction.created_at).toLocaleString("pt-BR")}
                       </CardDescription>
                     </div>
                   </div>
                   <div className="flex items-center gap-4">
                     <div
-                      className={`text-lg font-bold ${
+                      className={`text-lg font-bold whitespace-nowrap ${
                         transaction.type === "buy-in"
                           ? "text-red-600"
                           : transaction.type === "cash-out"
@@ -353,8 +353,8 @@ export function TransactionManager() {
                       </div>
                     )}
                     {transaction.notes && (
-                      <div className="col-span-2">
-                        <span className="font-medium">Notas:</span> {transaction.notes}
+                      <div className="col-span-2 break-words max-w-full">
+                        <span className="font-medium">Notas:</span> <span className="break-words">{transaction.notes}</span>
                       </div>
                     )}
                   </div>

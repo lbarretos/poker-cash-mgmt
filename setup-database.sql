@@ -153,12 +153,15 @@ BEGIN
     -- Remove constraint existente se houver
     ALTER TABLE transactions DROP CONSTRAINT IF EXISTS transactions_type_check;
     -- Adiciona nova constraint com payment
-    ALTER TABLE transactions ADD CONSTRAINT transactions_type_check CHECK (type IN ('buy-in', 'cash-out', 'payment'));
+    ALTER TABLE transactions ADD CONSTRAINT transactions_type_check CHECK (type IN ('buy-in', 'cash-out', 'payment', 'consumption'));
 EXCEPTION
     WHEN OTHERS THEN
         -- Ignora erro se a constraint já existe
         NULL;
 END $$;
+
+-- Adicionar campo de participantes (jsonb)
+ALTER TABLE transactions ADD COLUMN IF NOT EXISTS participants jsonb;
 
 -- 15. Verificação e correção da estrutura da tabela players
 DO $$ 

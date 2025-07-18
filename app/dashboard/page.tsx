@@ -20,15 +20,24 @@ import Link from "next/link"
 export default function Dashboard() {
   const { sessions, players, transactions, chips, loadData } = usePokerStore()
   const [activeTab, setActiveTab] = useState("dashboard")
+  const [selectedSessionId, setSelectedSessionId] = useState<string>("")
 
   // Carregar dados quando o componente montar
   useEffect(() => {
     loadData()
   }, [loadData])
 
+  // Filtrar transações e jogadores pela sessão selecionada
+  const filteredTransactions = selectedSessionId
+    ? transactions.filter((t) => t.session_id === selectedSessionId)
+    : transactions
+  const filteredSessions = sessions
+  const filteredPlayers = players // Jogadores não são filtrados, mas pode ser útil no futuro
+  const selectedSession = sessions.find((s) => s.id === selectedSessionId)
+
   const activeSessions = sessions.filter((s) => s.status === "active")
-  const totalBuyIns = transactions.filter((t) => t.type === "buy-in").reduce((sum, t) => sum + t.amount, 0)
-  const totalCashOuts = transactions.filter((t) => t.type === "cash-out").reduce((sum, t) => sum + t.amount, 0)
+  const totalBuyIns = filteredTransactions.filter((t) => t.type === "buy-in").reduce((sum, t) => sum + t.amount, 0)
+  const totalCashOuts = filteredTransactions.filter((t) => t.type === "cash-out").reduce((sum, t) => sum + t.amount, 0)
   const currentBalance = totalBuyIns - totalCashOuts
 
   const handleLogout = async () => {
@@ -40,20 +49,36 @@ export default function Dashboard() {
     <AuthGuard>
       <div className="min-h-screen bg-gradient-to-br from-green-50 to-blue-50 p-2 sm:p-4">
         <div className="max-w-7xl mx-auto">
-          <div className="mb-6 sm:mb-8 flex justify-between items-start">
-            <div>
-              <h1 className="text-2xl sm:text-3xl lg:text-4xl font-bold text-gray-900 mb-2">Gerenciador de Poker Cash</h1>
-              <p className="text-sm sm:text-base text-gray-600">
+          {/* Header superior responsivo: título em cima, controles embaixo */}
+          <div className="mb-6 sm:mb-8 w-full">
+            <div className="flex flex-col">
+              <h1 className="text-xl sm:text-3xl lg:text-4xl font-bold text-gray-900 mb-1 truncate">Gerenciador de Poker Cash</h1>
+              <p className="text-xs sm:text-base text-gray-600 truncate mb-2">
                 Gerencie suas sessões de poker, jogadores e fluxo de caixa de forma eficiente
               </p>
             </div>
-            <div className="flex gap-2">
+            <div className="flex flex-row flex-nowrap items-center gap-2 overflow-x-auto pb-2">
+              <div className="flex items-center gap-2 min-w-[120px]">
+                <label className="block text-xs font-medium text-gray-700 mb-1 whitespace-nowrap">Sessão</label>
+                <select
+                  className="border rounded px-2 py-1 text-xs sm:text-sm min-w-[90px] max-w-[140px]"
+                  value={selectedSessionId}
+                  onChange={e => setSelectedSessionId(e.target.value)}
+                >
+                  <option value="">Todas</option>
+                  {filteredSessions.map((s) => (
+                    <option key={s.id} value={s.id} className="truncate">
+                      {s.name} {s.status === "active" ? "(Ativa)" : "(Concluída)"}
+                    </option>
+                  ))}
+                </select>
+              </div>
               <Link href="/debug-data">
-                <Button variant="outline" size="sm" className="text-xs">
+                <Button variant="outline" size="sm" className="text-xs whitespace-nowrap">
                   Debug
                 </Button>
               </Link>
-              <Button variant="outline" onClick={handleLogout} className="flex items-center gap-2">
+              <Button variant="outline" onClick={handleLogout} className="flex items-center gap-2 text-xs whitespace-nowrap">
                 <LogOut className="h-4 w-4" />
                 Sair
               </Button>
@@ -121,7 +146,7 @@ export default function Dashboard() {
                   <CardContent>
                     <div className="text-lg sm:text-2xl font-bold">R${totalBuyIns.toFixed(2).replace(".", ",")}</div>
                     <p className="text-xs text-muted-foreground">
-                      {transactions.filter((t) => t.type === "buy-in").length} transações
+                      {filteredTransactions.filter((t) => t.type === "buy-in").length} transações
                     </p>
                   </CardContent>
                 </Card>
@@ -134,7 +159,7 @@ export default function Dashboard() {
                   <CardContent>
                     <div className="text-lg sm:text-2xl font-bold">R${totalCashOuts.toFixed(2).replace(".", ",")}</div>
                     <p className="text-xs text-muted-foreground">
-                      {transactions.filter((t) => t.type === "cash-out").length} transações
+                      {filteredTransactions.filter((t) => t.type === "cash-out").length} transações
                     </p>
                   </CardContent>
                 </Card>
@@ -234,7 +259,7 @@ export default function Dashboard() {
             </TabsContent>
 
             <TabsContent value="transactions">
-              <TransactionManager />
+              <TransactionManager transactions={filteredTransactions} />
             </TabsContent>
 
             <TabsContent value="chips">
