@@ -48,6 +48,14 @@ interface ChipCount {
   chipValue: number
 }
 
+interface Consumption {
+  id: string
+  payerId: string
+  amount: number
+  participantIds: string[]
+  description?: string
+}
+
 /* ------------------------------------------------------------------------- */
 /* Component */
 /* ------------------------------------------------------------------------- */
@@ -61,9 +69,16 @@ export function SettleUp({ sessionId, onClose }: SettleUpProps) {
   /* --------------------------------------------------------------------- */
   /* Local state */
   /* --------------------------------------------------------------------- */
-  const [activeTab, setActiveTab] = useState<"overview" | "chip-counts" | "settlement">("overview")
+  const [activeTab, setActiveTab] = useState<"overview" | "chip-counts" | "consumption" | "settlement">("overview")
   const [chipCounts, setChipCounts] = useState<ChipCount[]>([])
   const [chipCountsEntered, setChipCountsEntered] = useState(false)
+  const [consumptions, setConsumptions] = useState<Consumption[]>([])
+  const [consumptionForm, setConsumptionForm] = useState({
+    payerId: "",
+    amount: "",
+    participantIds: [] as string[],
+    description: ""
+  })
 
   /* --------------------------------------------------------------------- */
   /* Derived data */
@@ -71,7 +86,7 @@ export function SettleUp({ sessionId, onClose }: SettleUpProps) {
   const session = sessions.find((s) => s.id === sessionId)
   const sessionTransactions = transactions.filter((t) => t.session_id === sessionId)
 
-  /* players that played */
+  // Reintroduzir sessionPlayers apenas para chipCounts
   const sessionPlayers = useMemo(() => {
     const ids = new Set(sessionTransactions.map((t) => t.player_id))
     return Array.from(ids).map((id) => ({
@@ -79,6 +94,9 @@ export function SettleUp({ sessionId, onClose }: SettleUpProps) {
       name: players.find((p) => p.id === id)?.name ?? "Jogador Desconhecido",
     }))
   }, [sessionTransactions, players])
+
+  // Substituir sessionPlayers por allPlayers para consumo
+  const allPlayers = players
 
   /* initialise chip counts on first render */
   useMemo(() => {
@@ -93,12 +111,16 @@ export function SettleUp({ sessionId, onClose }: SettleUpProps) {
   const playerBalances = useMemo<PlayerBalance[]>(() => {
     const map = new Map<string, PlayerBalance>()
 
-    /* seed balances */
-    sessionTransactions.forEach((t) => {
-      if (!map.has(t.player_id)) {
-        map.set(t.player_id, {
-          playerId: t.player_id,
-          playerName: players.find((p) => p.id === t.player_id)?.name ?? "Jogador Desconhecido",
+    // Seed balances para todos os jogadores da sessão (com transação) e todos que participaram de consumo
+    const involvedPlayerIds = new Set([
+      ...sessionTransactions.map((t) => t.player_id),
+      ...consumptions.flatMap((c) => [c.payerId, ...c.participantIds]),
+    ])
+    Array.from(involvedPlayerIds).forEach((id) => {
+      if (!map.has(id)) {
+        map.set(id, {
+          playerId: id,
+          playerName: players.find((p) => p.id === id)?.name ?? "Jogador Desconhecido",
           buyIns: 0,
           cashOuts: 0,
           payments: 0,
@@ -109,7 +131,7 @@ export function SettleUp({ sessionId, onClose }: SettleUpProps) {
       }
     })
 
-    /* accumulate transactions */
+    // Acumular transações
     sessionTransactions.forEach((t) => {
       const bal = map.get(t.player_id)!
       bal.transactionCount += 1
@@ -118,19 +140,34 @@ export function SettleUp({ sessionId, onClose }: SettleUpProps) {
       if (t.type === "payment") bal.payments += t.amount
     })
 
-    /* merge chip counts */
+    // Mesclar chip counts
     chipCounts.forEach((c) => {
       const bal = map.get(c.playerId)
       if (bal) bal.finalChipValue = c.chipValue
     })
 
-    /* compute net */
+    // Consumos: pagador recebe crédito, participantes pagam fração
+    consumptions.forEach((cons) => {
+      const n = cons.participantIds.length
+      if (n === 0) return
+      const share = cons.amount / n
+      // Pagador recebe crédito do valor total
+      const payerBal = map.get(cons.payerId)
+      if (payerBal) payerBal.netPosition += cons.amount
+      // Cada participante paga sua fração
+      cons.participantIds.forEach((pid) => {
+        const partBal = map.get(pid)
+        if (partBal) partBal.netPosition -= share
+      })
+    })
+
+    // Calcular netPosition (sem consumo)
     map.forEach((bal) => {
-      bal.netPosition = bal.cashOuts + bal.finalChipValue - bal.buyIns + bal.payments
+      bal.netPosition += bal.cashOuts + bal.finalChipValue - bal.buyIns + bal.payments
     })
 
     return Array.from(map.values()).sort((a, b) => b.netPosition - a.netPosition)
-  }, [sessionTransactions, players, chipCounts])
+  }, [sessionTransactions, players, chipCounts, consumptions])
 
   /* ------------------------------------------------------------ */
   /* Optimal settlements                                          */
@@ -188,6 +225,7 @@ export function SettleUp({ sessionId, onClose }: SettleUpProps) {
     setChipCounts((prev) => prev.map((c) => (c.playerId === id ? { ...c, chipValue: num } : c)))
   }
 
+  // Alterar calculateSettlement para ir para a aba de consumo
   const calculateSettlement = () => {
     if (chipCounts.some((c) => c.chipValue < 0)) {
       toast({
@@ -197,11 +235,24 @@ export function SettleUp({ sessionId, onClose }: SettleUpProps) {
       })
       return
     }
+    // Validar se a soma das fichas finais bate com as iniciais
+    const totalFinalChipValue = chipCounts.reduce((s, c) => s + c.chipValue, 0)
+    const totalBuyIns = sessionTransactions.filter((t) => t.type === "buy-in").reduce((s, t) => s + t.amount, 0)
+    const totalPayments = sessionTransactions.filter((t) => t.type === "payment").reduce((s, t) => s + t.amount, 0)
+    const expected = totalBuyIns + totalPayments
+    if (Math.abs(totalFinalChipValue - expected) > 0.01) {
+      toast({
+        title: "Fichas não batem",
+        description: `A soma das fichas finais (R$${totalFinalChipValue.toFixed(2).replace('.', ',')}) não é igual ao total de fichas iniciais (R$${expected.toFixed(2).replace('.', ',')}). Corrija antes de prosseguir.`,
+        variant: "destructive",
+      })
+      return
+    }
     setChipCountsEntered(true)
-    setActiveTab("settlement")
+    setActiveTab("consumption")
     toast({
-      title: "Acerto de contas calculado",
-      description: "Contagens finais de fichas processadas com sucesso.",
+      title: "Contagens de fichas processadas",
+      description: "Agora registre os consumos antes do acerto final.",
     })
   }
 
@@ -218,6 +269,35 @@ export function SettleUp({ sessionId, onClose }: SettleUpProps) {
     setChipCountsEntered(false)
     setActiveTab("chip-counts")
   }
+
+  // Helper para resetar formulário de consumo
+  const resetConsumptionForm = () => setConsumptionForm({ payerId: "", amount: "", participantIds: [], description: "" })
+
+  // Adicionar consumo
+  const addConsumption = () => {
+    const amount = Number.parseFloat(consumptionForm.amount.replace(",", "."))
+    if (!consumptionForm.payerId || !amount || consumptionForm.participantIds.length === 0) {
+      toast({ title: "Preencha todos os campos do consumo", variant: "destructive" })
+      return
+    }
+    setConsumptions(prev => [
+      ...prev,
+      {
+        id: Math.random().toString(36).slice(2),
+        payerId: consumptionForm.payerId,
+        amount,
+        participantIds: consumptionForm.participantIds,
+        description: consumptionForm.description
+      }
+    ])
+    resetConsumptionForm()
+  }
+
+  // Remover consumo
+  const removeConsumption = (id: string) => setConsumptions(prev => prev.filter(c => c.id !== id))
+
+  // Só libera "Acerto" se fichas e consumos processados
+  const canGoToSettlement = chipCountsEntered
 
   /* --------------------------------------------------------------------- */
   /* Guard                                                                  */
@@ -247,7 +327,7 @@ export function SettleUp({ sessionId, onClose }: SettleUpProps) {
         {/* Tabs                                                              */}
         {/* ----------------------------------------------------------------- */}
         <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as any)} className="space-y-4 sm:space-y-6">
-          <TabsList className="grid grid-cols-3 gap-px bg-muted rounded-lg">
+          <TabsList className="grid grid-cols-4 gap-px bg-muted rounded-lg">
             <TabsTrigger value="overview" className="py-2 text-xs sm:text-sm">
               <span className="hidden sm:inline">Visão Geral</span>
               <span className="sm:hidden">📊</span>
@@ -256,9 +336,13 @@ export function SettleUp({ sessionId, onClose }: SettleUpProps) {
               <span className="hidden sm:inline">Fichas</span>
               <span className="sm:hidden">🪙</span>
             </TabsTrigger>
+            <TabsTrigger value="consumption" className="py-2 text-xs sm:text-sm">
+              <span className="hidden sm:inline">Consumo</span>
+              <span className="sm:hidden">🍻</span>
+            </TabsTrigger>
             <TabsTrigger
               value="settlement"
-              disabled={!chipCountsEntered}
+              disabled={!canGoToSettlement}
               className="py-2 text-xs sm:text-sm disabled:opacity-50"
             >
               <span className="hidden sm:inline">Acerto</span>
@@ -429,6 +513,115 @@ export function SettleUp({ sessionId, onClose }: SettleUpProps) {
                 </CardContent>
               </Card>
             )}
+          </TabsContent>
+
+          {/* Consumo */}
+          <TabsContent value="consumption" className="space-y-4 sm:space-y-6">
+            <Card>
+              <CardHeader>
+                <CardTitle className="text-base sm:text-lg">Adicionar Consumo</CardTitle>
+                <CardDescription className="text-sm">Registre gastos de consumo para rateio</CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="flex flex-col sm:flex-row gap-4">
+                  {/* Pagador */}
+                  <div className="flex-1">
+                    <Label>Quem pagou?</Label>
+                    <select
+                      className="w-full border rounded p-2 mt-1"
+                      value={consumptionForm.payerId}
+                      onChange={e => setConsumptionForm(f => ({ ...f, payerId: e.target.value }))}
+                    >
+                      <option value="">Selecione</option>
+                      {allPlayers.map(p => (
+                        <option key={p.id} value={p.id}>{p.name}</option>
+                      ))}
+                    </select>
+                  </div>
+                  {/* Valor */}
+                  <div className="flex-1">
+                    <Label>Valor total</Label>
+                    <Input
+                      type="text"
+                      inputMode="decimal"
+                      className="w-full mt-1"
+                      placeholder="0,00"
+                      value={consumptionForm.amount}
+                      onChange={e => setConsumptionForm(f => ({ ...f, amount: e.target.value }))}
+                    />
+                  </div>
+                </div>
+                {/* Participantes */}
+                <div>
+                  <Label>Quem participou?</Label>
+                  <div className="flex flex-wrap gap-2 mt-2">
+                    {allPlayers.map(p => (
+                      <label key={p.id} className="flex items-center gap-1 text-sm">
+                        <input
+                          type="checkbox"
+                          checked={consumptionForm.participantIds.includes(p.id)}
+                          onChange={e => {
+                            setConsumptionForm(f => ({
+                              ...f,
+                              participantIds: e.target.checked
+                                ? [...f.participantIds, p.id]
+                                : f.participantIds.filter(id => id !== p.id)
+                            }))
+                          }}
+                        />
+                        {p.name}
+                      </label>
+                    ))}
+                  </div>
+                </div>
+                {/* Descrição opcional */}
+                <div>
+                  <Label>Descrição (opcional)</Label>
+                  <Input
+                    type="text"
+                    className="w-full mt-1"
+                    placeholder="Ex: Cerveja, Pizza..."
+                    value={consumptionForm.description}
+                    onChange={e => setConsumptionForm(f => ({ ...f, description: e.target.value }))}
+                  />
+                </div>
+                <div className="flex gap-2 justify-end">
+                  <Button variant="outline" onClick={resetConsumptionForm}>Limpar</Button>
+                  <Button onClick={addConsumption}>Adicionar Consumo</Button>
+                </div>
+              </CardContent>
+            </Card>
+            {/* Lista de consumos adicionados */}
+            {consumptions.length > 0 && (
+              <Card>
+                <CardHeader>
+                  <CardTitle className="text-base sm:text-lg">Consumos Adicionados</CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-2">
+                  {consumptions.map(cons => (
+                    <div key={cons.id} className="flex flex-col sm:flex-row sm:items-center justify-between border rounded p-2 gap-2">
+                      <div>
+                        <span className="font-medium">{players.find(p => p.id === cons.payerId)?.name || "?"}</span> pagou <span className="font-bold text-blue-600">R${cons.amount.toFixed(2).replace(".", ",")}</span>
+                        {cons.description && <span className="ml-2 text-xs text-muted-foreground">({cons.description})</span>}
+                        <br />
+                        <span className="text-xs">Participantes: {cons.participantIds.map(pid => allPlayers.find(p => p.id === pid)?.name).join(", ")}</span>
+                      </div>
+                      <Button variant="destructive" size="sm" onClick={() => removeConsumption(cons.id)}>Remover</Button>
+                    </div>
+                  ))}
+                </CardContent>
+              </Card>
+            )}
+            <div className="text-center">
+              <Button onClick={() => setActiveTab("settlement")}
+                size="lg"
+                className="w-full sm:w-auto"
+                disabled={!canGoToSettlement}
+              >
+                <CheckCircle className="size-4 mr-2" />
+                Ir para Acerto Final
+              </Button>
+            </div>
           </TabsContent>
 
           {/* --------------------------------------------------------------- */}
