@@ -1,77 +1,44 @@
-# Poker Cash Management System
+# Poker Cash Management
 
-Um sistema completo para gerenciamento de sessões de poker, jogadores, transações e acerto de contas.
+Sistema para gerenciamento de sessões de poker cash game: jogadores, buy-ins, cash-outs, fichas e acerto de contas.
 
 ## Funcionalidades
 
-- ✅ **Gerenciamento de Sessões**: Crie e gerencie sessões de poker com múltiplas mesas
-- ✅ **Controle de Jogadores**: Cadastro e gerenciamento de jogadores
-- ✅ **Transações**: Controle de buy-ins, cash-outs e pagamentos
-- ✅ **Acerto de Contas**: Cálculo automático de débitos e créditos
-- ✅ **Gerenciamento de Fichas**: Controle de valores e cores das fichas
-- ✅ **Timer de Blinds**: Sistema de timer para torneios
-- ✅ **Interface Responsiva**: Otimizada para desktop e mobile
-- ✅ **Autenticação**: Sistema de login seguro com Supabase
+- **Sessões** — crie e acompanhe sessões de poker (ativas ou concluídas)
+- **Jogadores** — cadastro com email, telefone e notas
+- **Transações** — buy-ins, cash-outs, pagamentos e consumação (divisão automática de custos)
+- **Fichas** — configure tipos, cores e valores; recontagem manual
+- **Acerto de contas** — algoritmo que minimiza o número de pagamentos entre jogadores
+- **Timer** — timer de blinds para torneios com estrutura configurável
+- **Multi-usuário** — cada conta vê apenas seus próprios dados (RLS no Supabase)
+- **Responsivo** — otimizado para desktop e mobile
 
-## Tecnologias Utilizadas
+## Stack
 
-- **Frontend**: Next.js 14, React, TypeScript
-- **Styling**: Tailwind CSS, Shadcn/ui
-- **Backend**: Supabase (PostgreSQL, Auth, Real-time)
-- **State Management**: Zustand
-- **Deployment**: Vercel
+- **Frontend:** Next.js 14 (App Router), React 18, TypeScript, Tailwind CSS, shadcn/ui
+- **Estado:** Zustand (store único com chamadas diretas ao Supabase)
+- **Backend:** Supabase (PostgreSQL + Auth + RLS)
+- **Deploy:** Vercel
 
-## Configuração
-
-Veja o arquivo [SETUP.md](./SETUP.md) para instruções detalhadas de configuração.
-
-## Instalação Rápida
+## Setup rápido
 
 ```bash
-# Clone o repositório
-git clone <repository-url>
+git clone https://github.com/lbarretos/poker-cash-mgmt.git
 cd poker-cash-mgmt
-
-# Instale as dependências
-npm install
-
-# Configure as variáveis de ambiente
-cp .env.example .env.local
-# Edite .env.local com suas credenciais do Supabase
-
-# Execute o projeto
-npm run dev
+pnpm install
+cp .env.example .env.local   # preencha com suas credenciais do Supabase
+pnpm dev
 ```
 
-## Estrutura do Projeto
+> Requer **pnpm**. Instale com `npm install -g pnpm` se necessário.
 
+Veja [SETUP.md](./SETUP.md) para instruções completas de configuração do Supabase e deploy no Vercel.
+
+## Scripts
+
+```bash
+pnpm dev      # desenvolvimento
+pnpm build    # build de produção
+pnpm start    # rodar build localmente
+pnpm lint     # ESLint
 ```
-├── app/                    # Páginas da aplicação (App Router)
-├── components/            # Componentes React
-│   ├── ui/               # Componentes base (Shadcn/ui)
-│   └── auth/             # Componentes de autenticação
-├── lib/                  # Utilitários e configurações
-├── hooks/                # Custom hooks
-├── scripts/              # Scripts de teste e utilitários
-├── public/               # Arquivos estáticos
-└── styles/               # Estilos globais
-```
-
-## Scripts Disponíveis
-
-- `npm run dev` - Executar em modo de desenvolvimento
-- `npm run build` - Build para produção
-- `npm run start` - Executar build de produção
-- `npm run lint` - Executar linter
-
-## Contribuição
-
-1. Faça um fork do projeto
-2. Crie uma branch para sua feature (`git checkout -b feature/nova-feature`)
-3. Commit suas mudanças (`git commit -m 'Adiciona nova feature'`)
-4. Push para a branch (`git push origin feature/nova-feature`)
-5. Abra um Pull Request
-
-## Licença
-
-Este projeto está sob a licença MIT. Veja o arquivo [LICENSE](LICENSE) para mais detalhes.
