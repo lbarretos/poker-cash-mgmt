@@ -117,8 +117,8 @@ export function ChipManager() {
     return chipColors.find((c) => c.value === color) || chipColors[0]
   }
 
-  const totalChipValue = chips.reduce((sum, chip) => sum + chip.value * chip.count, 0)
-  const totalChipCount = chips.reduce((sum, chip) => sum + chip.count, 0)
+  const totalChipValue = chips.reduce((sum, chip) => sum + chip.value * (chip.count ?? 0), 0)
+  const totalChipCount = chips.reduce((sum, chip) => sum + (chip.count ?? 0), 0)
 
   const sortedChips = [...chips].sort((a, b) => a.value - b.value)
 
@@ -259,7 +259,7 @@ export function ChipManager() {
       <div className="grid gap-3 sm:gap-4">
         {sortedChips.map((chip) => {
           const colorInfo = getChipColorInfo(chip.color)
-          const chipValue = chip.value * chip.count
+          const chipValue = chip.value * (chip.count ?? 0)
 
           return (
             <Card key={chip.id}>

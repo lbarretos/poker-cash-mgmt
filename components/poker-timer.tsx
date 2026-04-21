@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect, useRef } from "react"
+import { useState, useEffect, useRef, useCallback } from "react"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -122,55 +122,34 @@ export function PokerTimer() {
   }, [timeLeft, currentPhase, config.currentLevel])
   
   const intervalRef = useRef<NodeJS.Timeout | null>(null)
-  
-  // Inicializar tempo baseado na configuração
-  useEffect(() => {
-    if (config.gameMode === "cash") {
-      setTimeLeft(config.gameDuration * 60)
+
+  const nextLevel = useCallback(() => {
+    const newLevel = config.currentLevel + 1
+    if (newLevel < config.blindLevels.length) {
+      setConfig(prev => ({ ...prev, currentLevel: newLevel }))
+      setTimeLeft(config.blindLevels[newLevel].duration * 60)
+      toast({
+        title: `Nível ${newLevel + 1}`,
+        description: `Blinds: ${config.blindLevels[newLevel].smallBlind}/${config.blindLevels[newLevel].bigBlind}`,
+      })
     } else {
-      const currentBlind = config.blindLevels[config.currentLevel]
-      if (currentBlind) {
-        setTimeLeft(currentBlind.duration * 60)
-      }
+      toast({
+        title: "Torneio finalizado!",
+        description: "Todos os níveis foram concluídos.",
+      })
     }
-  }, [config.gameMode, config.gameDuration, config.currentLevel, config.blindLevels])
-  
-  // Lógica do cronômetro
-  useEffect(() => {
-    if (isRunning && timeLeft > 0) {
-      intervalRef.current = setInterval(() => {
-        setTimeLeft(prev => {
-          if (prev <= 1) {
-            handleTimeExpired()
-            return 0
-          }
-          return prev - 1
-        })
-      }, 1000)
-    } else {
-      if (intervalRef.current) {
-        clearInterval(intervalRef.current)
-        intervalRef.current = null
-      }
-    }
-    
-    return () => {
-      if (intervalRef.current) {
-        clearInterval(intervalRef.current)
-      }
-    }
-  }, [isRunning, timeLeft])
-  
-  const handleTimeExpired = () => {
+  }, [config.currentLevel, config.blindLevels, toast])
+
+  const handleTimeExpired = useCallback(() => {
     setIsRunning(false)
-    
+
     if (config.gameMode === "tournament") {
       if (currentPhase === "game") {
         // Verificar se deve ter intervalo
-        const shouldBreak = config.autoBreaks && 
+        const shouldBreak = config.autoBreaks &&
           (config.currentLevel + 1) % config.breakInterval === 0 &&
           config.currentLevel + 1 < config.blindLevels.length
-        
+
         if (shouldBreak) {
           setCurrentPhase("break")
           setTimeLeft(config.breakDuration * 60)
@@ -197,24 +176,45 @@ export function PokerTimer() {
         description: "A sessão de cash game terminou.",
       })
     }
-  }
-  
-  const nextLevel = () => {
-    const newLevel = config.currentLevel + 1
-    if (newLevel < config.blindLevels.length) {
-      setConfig(prev => ({ ...prev, currentLevel: newLevel }))
-      setTimeLeft(config.blindLevels[newLevel].duration * 60)
-      toast({
-        title: `Nível ${newLevel + 1}`,
-        description: `Blinds: ${config.blindLevels[newLevel].smallBlind}/${config.blindLevels[newLevel].bigBlind}`,
-      })
+  }, [config, currentPhase, toast, nextLevel])
+
+  // Inicializar tempo baseado na configuração
+  useEffect(() => {
+    if (config.gameMode === "cash") {
+      setTimeLeft(config.gameDuration * 60)
     } else {
-      toast({
-        title: "Torneio finalizado!",
-        description: "Todos os níveis foram concluídos.",
-      })
+      const currentBlind = config.blindLevels[config.currentLevel]
+      if (currentBlind) {
+        setTimeLeft(currentBlind.duration * 60)
+      }
     }
-  }
+  }, [config.gameMode, config.gameDuration, config.currentLevel, config.blindLevels])
+
+  // Lógica do cronômetro
+  useEffect(() => {
+    if (isRunning && timeLeft > 0) {
+      intervalRef.current = setInterval(() => {
+        setTimeLeft(prev => {
+          if (prev <= 1) {
+            handleTimeExpired()
+            return 0
+          }
+          return prev - 1
+        })
+      }, 1000)
+    } else {
+      if (intervalRef.current) {
+        clearInterval(intervalRef.current)
+        intervalRef.current = null
+      }
+    }
+
+    return () => {
+      if (intervalRef.current) {
+        clearInterval(intervalRef.current)
+      }
+    }
+  }, [isRunning, timeLeft, handleTimeExpired])
   
   const toggleTimer = () => {
     setIsRunning(!isRunning)
