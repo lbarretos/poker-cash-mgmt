@@ -17,28 +17,20 @@ export function AuthGuard({ children }: AuthGuardProps) {
   useEffect(() => {
     const checkAuth = async () => {
       try {
-        console.log("🔍 AUTH GUARD: Verificando autenticação...")
-        
         const { data: { session }, error } = await supabase.auth.getSession()
-        
+
         if (error) {
-          console.error("❌ AUTH GUARD: Erro ao verificar sessão:", error.message)
-          // Auto-logout em caso de erro
           await supabase.auth.signOut()
           router.push("/login")
           return
         }
 
         if (session) {
-          console.log("✅ AUTH GUARD: Usuário autenticado:", session.user.email)
           setAuthenticated(true)
         } else {
-          console.log("🚫 AUTH GUARD: Usuário não autenticado, redirecionando...")
           router.push("/login")
         }
-      } catch (err) {
-        console.error("💥 AUTH GUARD: Erro geral:", err)
-        // Auto-logout em caso de erro crítico
+      } catch {
         await supabase.auth.signOut()
         router.push("/login")
       } finally {
@@ -46,31 +38,18 @@ export function AuthGuard({ children }: AuthGuardProps) {
       }
     }
 
-    // Verificar auth na inicialização
     checkAuth()
 
-    // Escutar mudanças na autenticação
-    const {
-      data: { subscription },
-    } = supabase.auth.onAuthStateChange(async (event, session) => {
-      console.log("🔄 AUTH GUARD: Mudança de estado:", event)
-      
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
       if (event === 'SIGNED_OUT' || !session) {
-        console.log("👋 AUTH GUARD: Usuário deslogado")
         setAuthenticated(false)
         router.push("/login")
-      } else if (event === 'SIGNED_IN' && session) {
-        console.log("👋 AUTH GUARD: Usuário logado:", session.user.email)
-        setAuthenticated(true)
-      } else if (event === 'TOKEN_REFRESHED') {
-        console.log("🔄 AUTH GUARD: Token renovado")
+      } else if (event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED') {
         setAuthenticated(true)
       }
     })
 
-    return () => {
-      subscription.unsubscribe()
-    }
+    return () => subscription.unsubscribe()
   }, [router])
 
   if (loading) {
@@ -84,9 +63,7 @@ export function AuthGuard({ children }: AuthGuardProps) {
     )
   }
 
-  if (!authenticated) {
-    return null
-  }
+  if (!authenticated) return null
 
   return <>{children}</>
-} 
+}
