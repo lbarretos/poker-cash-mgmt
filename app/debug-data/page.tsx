@@ -87,7 +87,7 @@ export default function DebugDataPage() {
                 </pre>
                 {dbInfo && !dbInfo.canAccessPlayers && (
                   <div className="mt-4 p-3 bg-red-100 border border-red-300 rounded text-red-800 text-sm">
-                    ⚠️ Problema detectado no acesso à tabela 'players': {dbInfo.error}
+                    ⚠️ Problema detectado no acesso à tabela &apos;players&apos;: {dbInfo.error}
                   </div>
                 )}
               </CardContent>
