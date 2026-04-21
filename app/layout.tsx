@@ -1,15 +1,18 @@
 import type React from "react"
 import type { Metadata } from "next"
-import { Inter } from "next/font/google"
+import { Figtree } from "next/font/google"
 import "./globals.css"
 import { Toaster } from "@/components/ui/toaster"
 
-const inter = Inter({ subsets: ["latin"] })
+const figtree = Figtree({
+  subsets: ["latin"],
+  variable: "--font-figtree",
+  display: "swap",
+})
 
 export const metadata: Metadata = {
-  title: "Gerenciador de Poker Cash",
-  description: "Gerencie suas sessões de poker cash game de forma eficiente",
-    generator: 'v0.dev'
+  title: "Poker Cash",
+  description: "Gerencie suas sessões de poker cash game",
 }
 
 export default function RootLayout({
@@ -19,7 +22,7 @@ export default function RootLayout({
 }) {
   return (
     <html lang="pt-BR">
-      <body className={inter.className}>
+      <body className={`${figtree.variable} font-[family-name:var(--font-figtree)]`}>
         {children}
         <Toaster />
       </body>

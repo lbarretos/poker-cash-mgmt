@@ -3,9 +3,8 @@
 import { useState } from "react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Alert, AlertDescription } from "@/components/ui/alert"
-import { Lock, Eye, EyeOff, Mail, Loader2 } from "lucide-react"
+import { Eye, EyeOff, Loader2, Coins } from "lucide-react"
 import { supabase } from "@/lib/supabase"
 
 export function LoginForm() {
@@ -14,123 +13,113 @@ export function LoginForm() {
   const [showPassword, setShowPassword] = useState(false)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState("")
-  const [success, setSuccess] = useState("")
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault()
     setLoading(true)
     setError("")
-    setSuccess("")
 
     try {
       const { data, error } = await supabase.auth.signInWithPassword({ email, password })
 
       if (error) {
-        setError(`Erro: ${error.message}`)
+        setError("Email ou senha incorretos.")
         return
       }
 
       if (!data.user || !data.session) {
-        setError("Resposta inesperada do servidor. Tente novamente.")
+        setError("Resposta inesperada. Tente novamente.")
         return
       }
 
-      setSuccess("Login realizado com sucesso! Redirecionando...")
-      setTimeout(() => { window.location.href = "/dashboard" }, 1500)
-    } catch (err) {
-      setError(`Erro inesperado: ${err instanceof Error ? err.message : 'Erro desconhecido'}`)
+      window.location.href = "/dashboard"
+    } catch {
+      setError("Erro inesperado. Tente novamente.")
     } finally {
       setLoading(false)
     }
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-green-50 to-blue-50 flex items-center justify-center p-4">
-      <Card className="w-full max-w-md">
-        <CardHeader className="text-center">
-          <div className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-full bg-green-100">
-            <Lock className="h-6 w-6 text-green-600" />
-          </div>
-          <CardTitle className="text-2xl font-bold">Acesso ao Dashboard</CardTitle>
-          <CardDescription>
-            Digite seu email e senha para acessar o gerenciador de poker
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          <form onSubmit={handleLogin} className="space-y-4">
-            <div className="space-y-2">
-              <div className="relative">
-                <Mail className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
-                <Input
-                  type="email"
-                  placeholder="Digite seu email"
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  className="pl-10"
-                  required
-                  disabled={loading}
-                />
-              </div>
+    <div className="min-h-screen bg-background flex flex-col items-center justify-center p-6">
+
+      {/* Logo mark */}
+      <div className="mb-8 flex flex-col items-center gap-3">
+        <div className="w-14 h-14 rounded-2xl bg-primary flex items-center justify-center shadow-lg shadow-primary/20">
+          <Coins className="h-7 w-7 text-white" />
+        </div>
+        <div className="text-center">
+          <h1 className="text-2xl font-bold tracking-tight text-foreground">Poker Cash</h1>
+          <p className="text-sm text-muted-foreground mt-1">Entre na sua conta</p>
+        </div>
+      </div>
+
+      {/* Card */}
+      <div className="w-full max-w-sm bg-card rounded-2xl border border-border/60 shadow-sm overflow-hidden">
+        <form onSubmit={handleLogin} className="p-6 space-y-4">
+          <div className="space-y-3">
+            <Input
+              type="email"
+              placeholder="Email"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              required
+              disabled={loading}
+              className="h-11 bg-muted/50 border-0 focus-visible:ring-2 focus-visible:ring-primary/40 rounded-xl text-[15px] placeholder:text-muted-foreground/60"
+              autoComplete="email"
+              autoFocus
+            />
+
+            <div className="relative">
+              <Input
+                type={showPassword ? "text" : "password"}
+                placeholder="Senha"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                required
+                disabled={loading}
+                className="h-11 bg-muted/50 border-0 focus-visible:ring-2 focus-visible:ring-primary/40 rounded-xl text-[15px] placeholder:text-muted-foreground/60 pr-11"
+                autoComplete="current-password"
+              />
+              <button
+                type="button"
+                onClick={() => setShowPassword(!showPassword)}
+                className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors"
+                tabIndex={-1}
+              >
+                {showPassword
+                  ? <EyeOff className="h-4 w-4" />
+                  : <Eye className="h-4 w-4" />
+                }
+              </button>
             </div>
-
-            <div className="space-y-2">
-              <div className="relative">
-                <Input
-                  type={showPassword ? "text" : "password"}
-                  placeholder="Digite sua senha"
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  className="pr-10"
-                  required
-                  disabled={loading}
-                />
-                <Button
-                  type="button"
-                  variant="ghost"
-                  size="sm"
-                  className="absolute right-0 top-0 h-full px-3 py-2 hover:bg-transparent"
-                  onClick={() => setShowPassword(!showPassword)}
-                  disabled={loading}
-                >
-                  {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-                </Button>
-              </div>
-            </div>
-
-            {error && (
-              <Alert variant="destructive">
-                <AlertDescription>{error}</AlertDescription>
-              </Alert>
-            )}
-
-            {success && (
-              <Alert className="border-green-200 bg-green-50 text-green-800">
-                <AlertDescription className="flex items-center gap-2">
-                  <Loader2 className="h-4 w-4 animate-spin" />
-                  {success}
-                </AlertDescription>
-              </Alert>
-            )}
-
-            <Button type="submit" className="w-full" disabled={loading}>
-              {loading ? (
-                <>
-                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                  Entrando...
-                </>
-              ) : (
-                "Entrar"
-              )}
-            </Button>
-          </form>
-
-          <div className="mt-6 text-center">
-            <p className="text-sm text-gray-600">
-              Primeira vez? Crie sua conta no Supabase primeiro.
-            </p>
           </div>
-        </CardContent>
-      </Card>
+
+          {error && (
+            <Alert variant="destructive" className="border-0 bg-destructive/8 rounded-xl py-2.5">
+              <AlertDescription className="text-sm">{error}</AlertDescription>
+            </Alert>
+          )}
+
+          <Button
+            type="submit"
+            disabled={loading}
+            className="w-full h-11 rounded-xl text-[15px] font-semibold bg-primary hover:bg-primary/90 text-white shadow-md shadow-primary/20 transition-all"
+          >
+            {loading
+              ? <Loader2 className="h-4 w-4 animate-spin" />
+              : "Entrar"
+            }
+          </Button>
+        </form>
+
+        <div className="px-6 pb-5 text-center">
+          <p className="text-xs text-muted-foreground/70">
+            Primeira vez? Crie sua conta no painel do Supabase.
+          </p>
+        </div>
+      </div>
+
     </div>
   )
 }
