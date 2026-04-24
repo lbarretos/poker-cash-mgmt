@@ -113,10 +113,7 @@ export function LoginForm() {
           </Button>
         </form>
 
-        <div className="px-6 pb-5 text-center space-y-1.5">
-          <p className="text-xs text-muted-foreground/70">
-            Primeira vez? Crie sua conta no painel do Supabase.
-          </p>
+        <div className="px-6 pb-5 text-center">
           <p className="text-xs text-muted-foreground/70">
             Quer criar uma conta por diversão?{" "}
             <a
