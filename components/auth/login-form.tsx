@@ -113,9 +113,18 @@ export function LoginForm() {
           </Button>
         </form>
 
-        <div className="px-6 pb-5 text-center">
+        <div className="px-6 pb-5 text-center space-y-1.5">
           <p className="text-xs text-muted-foreground/70">
             Primeira vez? Crie sua conta no painel do Supabase.
+          </p>
+          <p className="text-xs text-muted-foreground/70">
+            Quer criar uma conta por diversão?{" "}
+            <a
+              href="mailto:l.barretos@outlook.com"
+              className="underline underline-offset-2 hover:text-foreground transition-colors"
+            >
+              Clique aqui para me pedir um registro.
+            </a>
           </p>
         </div>
       </div>
