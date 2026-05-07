@@ -2,8 +2,8 @@ name: Supabase Keep-Alive
 
 on:
   schedule:
-    # Executa no primeiro dia de cada mês às 08:00 UTC
-    - cron: '0 8 1 * *'
+    # Executa toda segunda-feira às 08:00 UTC
+    - cron: '0 8 * * 1'
   workflow_dispatch: # permite acionar manualmente pelo GitHub
 
 jobs:
