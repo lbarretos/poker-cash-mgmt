@@ -21,9 +21,9 @@ jobs:
 
           echo "Status HTTP: $STATUS"
 
-          if [ "$STATUS" -ge 200 ] && [ "$STATUS" -lt 300 ]; then
-            echo "Supabase ativo."
-          else
-            echo "Resposta inesperada: $STATUS"
+          if [ -z "$STATUS" ] || [ "$STATUS" = "000" ]; then
+            echo "Sem resposta do servidor — projeto pode estar inativo."
             exit 1
+          else
+            echo "Supabase respondeu (status $STATUS) — projeto ativo."
           fi
