@@ -2,9 +2,9 @@ name: Supabase Keep-Alive
 
 on:
   schedule:
-    # Executa toda segunda-feira às 08:00 UTC
-    - cron: '0 8 * * 1'
-  workflow_dispatch: # permite acionar manualmente pelo GitHub
+    # Executa a cada 3 dias: dom, qua e qui às 08:00 UTC
+    - cron: '0 8 * * 0,3,4'
+  workflow_dispatch:
 
 jobs:
   keepalive:
@@ -12,18 +12,81 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Health check no Supabase
+      - name: Extrair project ref da URL
+        id: extract_ref
+        run: |
+          URL="${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}"
+          # URL formato: https://<ref>.supabase.co
+          REF=$(echo "$URL" | sed 's|https://||' | cut -d'.' -f1)
+          echo "ref=$REF" >> "$GITHUB_OUTPUT"
+
+      - name: Verificar status do projeto
+        id: check_status
         run: |
           STATUS=$(curl -s -o /dev/null -w "%{http_code}" \
-            "${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}/rest/v1/" \
-            -H "apikey: ${{ secrets.NEXT_PUBLIC_SUPABASE_ANON_KEY }}" \
-            -H "Authorization: Bearer ${{ secrets.NEXT_PUBLIC_SUPABASE_ANON_KEY }}")
+            "https://api.supabase.com/v1/projects/${{ steps.extract_ref.outputs.ref }}" \
+            -H "Authorization: Bearer ${{ secrets.SUPABASE_ACCESS_TOKEN }}")
 
-          echo "Status HTTP: $STATUS"
+          echo "Status da Management API: $STATUS"
 
-          if [ -z "$STATUS" ] || [ "$STATUS" = "000" ]; then
-            echo "Sem resposta do servidor — projeto pode estar inativo."
-            exit 1
+          if [ "$STATUS" = "200" ]; then
+            # Verificar se está pausado
+            RESPONSE=$(curl -s \
+              "https://api.supabase.com/v1/projects/${{ steps.extract_ref.outputs.ref }}" \
+              -H "Authorization: Bearer ${{ secrets.SUPABASE_ACCESS_TOKEN }}")
+            PROJECT_STATUS=$(echo "$RESPONSE" | grep -o '"status":"[^"]*"' | cut -d'"' -f4)
+            echo "Status do projeto: $PROJECT_STATUS"
+            echo "project_status=$PROJECT_STATUS" >> "$GITHUB_OUTPUT"
           else
-            echo "Supabase respondeu (status $STATUS) — projeto ativo."
+            echo "Não foi possível verificar status (HTTP $STATUS) — sem SUPABASE_ACCESS_TOKEN configurado?"
+            echo "project_status=unknown" >> "$GITHUB_OUTPUT"
           fi
+
+      - name: Restaurar projeto se pausado
+        if: steps.check_status.outputs.project_status == 'INACTIVE' || steps.check_status.outputs.project_status == 'PAUSED'
+        run: |
+          echo "Projeto pausado — solicitando restauração..."
+          RESTORE=$(curl -s -w "\n%{http_code}" -X POST \
+            "https://api.supabase.com/v1/projects/${{ steps.extract_ref.outputs.ref }}/restore" \
+            -H "Authorization: Bearer ${{ secrets.SUPABASE_ACCESS_TOKEN }}" \
+            -H "Content-Type: application/json")
+
+          HTTP_CODE=$(echo "$RESTORE" | tail -n1)
+          echo "Resposta da restauração: HTTP $HTTP_CODE"
+
+          if [ "$HTTP_CODE" = "201" ] || [ "$HTTP_CODE" = "200" ]; then
+            echo "Restauração solicitada com sucesso. Aguardando projeto inicializar..."
+            sleep 60
+          else
+            echo "Falha ao solicitar restauração (HTTP $HTTP_CODE)"
+            exit 1
+          fi
+
+      - name: Executar query real para resetar timer de inatividade
+        run: |
+          RESPONSE=$(curl -s -w "\n%{http_code}" \
+            "${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}/rest/v1/rpc/keepalive_ping" \
+            -X POST \
+            -H "apikey: ${{ secrets.NEXT_PUBLIC_SUPABASE_ANON_KEY }}" \
+            -H "Authorization: Bearer ${{ secrets.NEXT_PUBLIC_SUPABASE_ANON_KEY }}" \
+            -H "Content-Type: application/json" \
+            -d '{}')
+
+          HTTP_CODE=$(echo "$RESPONSE" | tail -n1)
+          echo "Resposta da função keepalive: HTTP $HTTP_CODE"
+
+          # Fallback: query real na tabela chip_types se a função não existir
+          if [ "$HTTP_CODE" = "404" ] || [ "$HTTP_CODE" = "000" ]; then
+            echo "Função keepalive_ping não encontrada — executando query real na tabela chip_types..."
+            STATUS=$(curl -s -o /dev/null -w "%{http_code}" \
+              "${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}/rest/v1/chip_types?select=id&limit=1" \
+              -H "apikey: ${{ secrets.NEXT_PUBLIC_SUPABASE_ANON_KEY }}" \
+              -H "Authorization: Bearer ${{ secrets.NEXT_PUBLIC_SUPABASE_ANON_KEY }}")
+            echo "Query real: HTTP $STATUS"
+            if [ "$STATUS" != "200" ] && [ "$STATUS" != "206" ]; then
+              echo "Falha na query (HTTP $STATUS)"
+              exit 1
+            fi
+          fi
+
+          echo "Keep-alive concluído."
